@@ -324,7 +324,7 @@ private fun DualLibraryArchitectureCard() {
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Audit Status: ${if (fullAudit.allPassed) "ALL 7 STEPS PASSED" else "NEEDS REVIEW"} • ${fullAudit.pagesCoveredCount}/${fullAudit.totalPagesExpected} pages covered • ${fullAudit.mathChecks.count { it.passed }}/${fullAudit.mathChecks.size} independent math checks verified.",
+                text = "Audit Status: ${if (fullAudit.allPassed) "ALL 7 STEPS PASSED" else "SOURCE REVIEW PENDING"} • Page-by-page coverage not yet audited (English/Kannada and Part 1/2 use separate pagination) • ${fullAudit.mathChecks.count { it.passed }}/${fullAudit.mathChecks.size} bundled math checks passed.",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (fullAudit.allPassed) EmeraldChalk else MaterialTheme.colorScheme.error
             )
@@ -404,7 +404,7 @@ private fun DualLibraryArchitectureCard() {
                                         verticalArrangement = Arrangement.spacedBy(3.dp)
                                     ) {
                                         Text(
-                                            text = "Ch ${cr.chapterNumber}: ${cr.chapterTitleEn} (pp. ${cr.startPage}–${cr.endPage}) • ${cr.status.label}",
+                                            text = "Ch ${cr.chapterNumber}: ${cr.chapterTitleEn} (English pp. ${cr.startPage}–${cr.endPage}) • ${cr.status.label}",
                                             style = MaterialTheme.typography.labelLarge,
                                             color = if (cr.status == AuditStepStatus.PASSED) EmeraldChalk else MaterialTheme.colorScheme.error
                                         )
