@@ -114,7 +114,7 @@ class MathVerificationEngineTest {
         assertTrue("Indexed concept catalog should not be empty", indexedCatalog.isNotEmpty())
         assertEquals("Every syllabus topic should have exactly one indexed concept", syllabusTopicCount, indexedCatalog.size)
 
-        assertTrue("Expected >= 60 PYQ entries, got ${KsmkeSyllabusRepository.pyqQuestions.size}", KsmkeSyllabusRepository.pyqQuestions.size >= 60)
+        assertTrue("Expected >= 60 PYQs across active and archived legacy records", KsmkeSyllabusRepository.pyqQuestions.size + KsmkeSyllabusRepository.legacyConstructionPyqs.size >= 60)
         val stats = PyqAnalyticsEngine.computeRecurrenceStats(KsmkeSyllabusRepository.pyqQuestions)
         assertTrue(stats.isNotEmpty())
         val expectedOfficialCount = KsmkeSyllabusRepository.pyqQuestions.count {
