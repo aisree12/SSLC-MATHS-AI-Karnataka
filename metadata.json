@@ -1,0 +1,6 @@
+{
+  "name": "SSLC Maths AI",
+  "description": "Dedicated Karnataka SSLC Class 10 Mathematics AI Teacher, KSMKE Knowledge Engine, PYQ Intelligence, and 80-mark Exam Simulator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

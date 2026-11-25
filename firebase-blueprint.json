@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Karnataka SSLC student learning profile and readiness metrics",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID of the student" },
+        "displayName": { "type": "string", "description": "Student display name (1-80 chars)" },
+        "preferredLanguage": {
+          "type": "string",
+          "enum": ["EN", "KN", "BILINGUAL"],
+          "description": "Preferred tutoring language mode"
+        },
+        "targetScore": { "type": "integer", "description": "Target board exam score (35-100)" },
+        "readinessScore": { "type": "integer", "description": "Current estimated readiness percentage (0-100)" },
+        "dailyGoalMinutes": { "type": "integer", "description": "Daily study goal in minutes (15-240)" },
+        "completedTodayMinutes": { "type": "integer", "description": "Minutes studied today (0-600)" },
+        "streakDays": { "type": "integer", "description": "Consecutive study days (0-3650)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Server timestamp on creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Server timestamp on update" }
+      },
+      "required": [
+        "userId",
+        "displayName",
+        "preferredLanguage",
+        "targetScore",
+        "readinessScore",
+        "dailyGoalMinutes",
+        "completedTodayMinutes",
+        "streakDays",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ChapterMasteryRecord": {
+      "title": "ChapterMasteryRecord",
+      "description": "Per-chapter SSLC Mathematics mastery status and accuracy",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "chapterNumber": { "type": "integer", "description": "SSLC Chapter 1-15" },
+        "masteryStatus": {
+          "type": "string",
+          "enum": ["NOT_STARTED", "NEEDS_FOUNDATION", "PARTIALLY_UNDERSTOOD", "UNDERSTOOD"],
+          "description": "Current mastery tier"
+        },
+        "accuracyPercent": { "type": "integer", "description": "Accuracy percentage (0-100)" },
+        "questionsSolved": { "type": "integer", "description": "Number of verified questions solved" },
+        "commonMistakeNote": { "type": "string", "description": "Recorded mistake pattern note (0-500 chars)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "chapterNumber",
+        "masteryStatus",
+        "accuracyPercent",
+        "questionsSolved",
+        "commonMistakeNote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExamAttemptRecord": {
+      "title": "ExamAttemptRecord",
+      "description": "Timed SSLC Mock Examination or Chapter Test result",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "examTitle": { "type": "string", "description": "Title of mock paper or chapter test" },
+        "examMode": {
+          "type": "string",
+          "enum": ["FULL_BOARD_80", "CHAPTER_TEST_20", "SPEED_DRILL_10"]
+        },
+        "scoreObtained": { "type": "number", "description": "Marks scored (0.0-80.0)" },
+        "maxMarks": { "type": "integer", "description": "Maximum marks (1-80)" },
+        "durationSeconds": { "type": "integer", "description": "Time spent in seconds" },
+        "questionsAttempted": { "type": "integer", "description": "Questions attempted (0-38)" },
+        "questionsSkipped": { "type": "integer", "description": "Questions skipped (0-38)" },
+        "slowestTopic": { "type": "string", "description": "Topic taking longest time" },
+        "feedbackSummary": { "type": "string", "description": "Time and presentation coaching summary" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "examTitle",
+        "examMode",
+        "scoreObtained",
+        "maxMarks",
+        "durationSeconds",
+        "questionsAttempted",
+        "questionsSkipped",
+        "slowestTopic",
+        "feedbackSummary",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "StudyGoalRecord": {
+      "title": "StudyGoalRecord",
+      "description": "Personalized study timetable item and daily goal",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Owner Firebase Auth UID" },
+        "title": { "type": "string", "description": "Goal title (1-120 chars)" },
+        "chapterNumber": { "type": "integer", "description": "Target chapter 1-15" },
+        "targetMinutes": { "type": "integer", "description": "Allocated minutes (5-180)" },
+        "completed": { "type": "boolean", "description": "Completion flag" },
+        "scheduledSlot": { "type": "string", "description": "Time slot label (1-40 chars)" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "title",
+        "chapterNumber",
+        "targetMinutes",
+        "completed",
+        "scheduledSlot",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated student profile and readiness summary"
+    },
+    "/users/{userId}/chapterMastery/{chapterId}": {
+      "schema": { "$ref": "#/entities/ChapterMasteryRecord" },
+      "description": "Per-chapter SSLC Mathematics mastery records"
+    },
+    "/users/{userId}/examAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/ExamAttemptRecord" },
+      "description": "Completed mock exams and chapter test records"
+    },
+    "/users/{userId}/studyGoals/{goalId}": {
+      "schema": { "$ref": "#/entities/StudyGoalRecord" },
+      "description": "Daily personalized study timetable goals"
+    }
+  }
+}

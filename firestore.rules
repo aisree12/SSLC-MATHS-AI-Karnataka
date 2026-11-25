@@ -1,0 +1,195 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default-deny everything
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+             data.preferredLanguage in ['EN', 'KN', 'BILINGUAL'] &&
+             data.targetScore is int && data.targetScore >= 35 && data.targetScore <= 100 &&
+             data.readinessScore is int && data.readinessScore >= 0 && data.readinessScore <= 100 &&
+             data.dailyGoalMinutes is int && data.dailyGoalMinutes >= 15 && data.dailyGoalMinutes <= 240 &&
+             data.completedTodayMinutes is int && data.completedTodayMinutes >= 0 && data.completedTodayMinutes <= 600 &&
+             data.streakDays is int && data.streakDays >= 0 && data.streakDays <= 3650 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidChapterMastery(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.chapterNumber is int && data.chapterNumber >= 1 && data.chapterNumber <= 15 &&
+             data.masteryStatus in ['NOT_STARTED', 'NEEDS_FOUNDATION', 'PARTIALLY_UNDERSTOOD', 'UNDERSTOOD'] &&
+             data.accuracyPercent is int && data.accuracyPercent >= 0 && data.accuracyPercent <= 100 &&
+             data.questionsSolved is int && data.questionsSolved >= 0 && data.questionsSolved <= 10000 &&
+             data.commonMistakeNote is string && data.commonMistakeNote.size() <= 500 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidExamAttempt(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.examTitle is string && data.examTitle.size() >= 1 && data.examTitle.size() <= 120 &&
+             data.examMode in ['FULL_BOARD_80', 'CHAPTER_TEST_20', 'SPEED_DRILL_10'] &&
+             (data.scoreObtained is int || data.scoreObtained is float) &&
+             data.scoreObtained >= 0 && data.scoreObtained <= 80 &&
+             data.maxMarks is int && data.maxMarks >= 1 && data.maxMarks <= 80 &&
+             data.durationSeconds is int && data.durationSeconds >= 0 && data.durationSeconds <= 18000 &&
+             data.questionsAttempted is int && data.questionsAttempted >= 0 && data.questionsAttempted <= 38 &&
+             data.questionsSkipped is int && data.questionsSkipped >= 0 && data.questionsSkipped <= 38 &&
+             data.slowestTopic is string && data.slowestTopic.size() <= 120 &&
+             data.feedbackSummary is string && data.feedbackSummary.size() <= 1000 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidStudyGoal(data, userId) {
+      return data.userId is string && data.userId == userId &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+             data.chapterNumber is int && data.chapterNumber >= 1 && data.chapterNumber <= 15 &&
+             data.targetMinutes is int && data.targetMinutes >= 5 && data.targetMinutes <= 180 &&
+             data.completed is bool &&
+             data.scheduledSlot is string && data.scheduledSlot.size() >= 1 && data.scheduledSlot.size() <= 40 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       incoming().keys().hasAll([
+                         'userId', 'displayName', 'preferredLanguage', 'targetScore',
+                         'readinessScore', 'dailyGoalMinutes', 'completedTodayMinutes',
+                         'streakDays', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'userId', 'displayName', 'preferredLanguage', 'targetScore',
+                         'readinessScore', 'dailyGoalMinutes', 'completedTodayMinutes',
+                         'streakDays', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidUserProfile(incoming(), userId);
+
+      allow update: if isOwner(userId) &&
+                       isValidId(userId) &&
+                       isValidUserProfile(incoming(), userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'displayName', 'preferredLanguage', 'targetScore',
+                         'readinessScore', 'dailyGoalMinutes', 'completedTodayMinutes',
+                         'streakDays', 'updatedAt'
+                       ]);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /chapterMastery/{chapterId} {
+        allow get: if isOwner(userId) && isValidId(chapterId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(chapterId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'chapterNumber', 'masteryStatus', 'accuracyPercent',
+                           'questionsSolved', 'commonMistakeNote', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'chapterNumber', 'masteryStatus', 'accuracyPercent',
+                           'questionsSolved', 'commonMistakeNote', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidChapterMastery(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(chapterId) &&
+                         isValidChapterMastery(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().chapterNumber == existing().chapterNumber &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'masteryStatus', 'accuracyPercent', 'questionsSolved',
+                           'commonMistakeNote', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(chapterId);
+      }
+
+      match /examAttempts/{attemptId} {
+        allow get: if isOwner(userId) && isValidId(attemptId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(attemptId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'examTitle', 'examMode', 'scoreObtained', 'maxMarks',
+                           'durationSeconds', 'questionsAttempted', 'questionsSkipped',
+                           'slowestTopic', 'feedbackSummary', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'examTitle', 'examMode', 'scoreObtained', 'maxMarks',
+                           'durationSeconds', 'questionsAttempted', 'questionsSkipped',
+                           'slowestTopic', 'feedbackSummary', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidExamAttempt(incoming(), userId);
+
+        allow update: if false;
+
+        allow delete: if isOwner(userId) && isValidId(attemptId);
+      }
+
+      match /studyGoals/{goalId} {
+        allow get: if isOwner(userId) && isValidId(goalId);
+        allow list: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+                         isValidId(goalId) &&
+                         incoming().keys().hasAll([
+                           'userId', 'title', 'chapterNumber', 'targetMinutes',
+                           'completed', 'scheduledSlot', 'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'userId', 'title', 'chapterNumber', 'targetMinutes',
+                           'completed', 'scheduledSlot', 'createdAt', 'updatedAt'
+                         ]) &&
+                         isValidStudyGoal(incoming(), userId);
+
+        allow update: if isOwner(userId) &&
+                         isValidId(goalId) &&
+                         isValidStudyGoal(incoming(), userId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'title', 'chapterNumber', 'targetMinutes',
+                           'completed', 'scheduledSlot', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(goalId);
+      }
+    }
+  }
+}
