@@ -370,9 +370,8 @@ object OpenWeightModelCatalog {
 
     val models: List<OpenWeightModelSpec> = listOf(
         // Google Gemini API-key models (Google AI Studio)
-        OpenWeightModelSpec("gemini-2.5-flash", "Gemini 2.5 Flash (API Key • Recommended)", "Gemini 2.5", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
-        OpenWeightModelSpec("gemini-2.5-flash-lite", "Gemini 2.5 Flash-Lite (API Key • Fast)", "Gemini 2.5 Lite", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
-        OpenWeightModelSpec("gemini-2.5-pro", "Gemini 2.5 Pro (API Key • Reasoning)", "Gemini 2.5 Pro", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
+        OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (API Key • Recommended)", "Gemini 3.8", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
+        OpenWeightModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (API Key • Fast)", "Gemini 3.5 Lite", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
 
         // Google Gemini via Firebase AI Logic (Keyless App Check)
         OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (Vision + Fast)", "Gemini 3", OpenWeightProvider.GEMINI, supportsVision = true),
