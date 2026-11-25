@@ -169,10 +169,13 @@ object OfficialSourceLibrary {
 
     fun auditChapter(chapterNumber: Int): ChapterCorpusAudit {
         val ch = KsmkeSyllabusRepository.getChapter(chapterNumber)
-        val supp = KsmkeSupplementLibrary.byOfficialChapter[chapterNumber]
-        val exRefs = supp?.exercises?.joinToString(", ") { it.exerciseId }?.let { "Legacy references only: $it" }
-            ?: ch.detailedTopics.mapNotNull { legacyTopicSourceIndex[it.topicNumber]?.exerciseRef }.joinToString(", ")
-                .ifBlank { "Mapped in KTBS Index" }
+        val officialExerciseIds = OfficialSyllabus2026_27.chapter(chapterNumber)?.exerciseIds.orEmpty()
+        val exRefs = if (officialExerciseIds.isNotEmpty()) {
+            "English textbook exercise IDs: " + officialExerciseIds.joinToString(", ") { "Ex $it" } +
+                ". Kannada exercise-by-exercise parity pending."
+        } else {
+            "Official exercise IDs not yet verified."
+        }
         val status = SyllabusCertificationState.PARTIAL_CURATED
         return ChapterCorpusAudit(
             chapterNumber = ch.chapterNumber,
