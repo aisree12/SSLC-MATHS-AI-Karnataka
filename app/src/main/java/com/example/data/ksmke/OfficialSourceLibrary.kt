@@ -168,15 +168,11 @@ object OfficialSourceLibrary {
 
     fun auditChapter(chapterNumber: Int): ChapterCorpusAudit {
         val ch = KsmkeSyllabusRepository.getChapter(chapterNumber)
-        val supp = KsmkeSupplementLibrary.byChapter[chapterNumber]
+        val supp = KsmkeSupplementLibrary.byOfficialChapter[chapterNumber]
         val exRefs = supp?.exercises?.joinToString(", ") { it.exerciseId }
             ?: ch.detailedTopics.mapNotNull { topicSourceIndex[it.topicNumber]?.exerciseRef }.joinToString(", ")
                 .ifBlank { "Mapped in KTBS Index" }
-        val status = if (supp != null && ch.detailedTopics.isNotEmpty() && ch.solvedExamples.isNotEmpty()) {
-            SyllabusCertificationState.CERTIFIED_COMPLETE
-        } else {
-            SyllabusCertificationState.PARTIAL_CURATED
-        }
+        val status = SyllabusCertificationState.PARTIAL_CURATED
         return ChapterCorpusAudit(
             chapterNumber = ch.chapterNumber,
             ktbsPageRange = ch.pageRange,
@@ -184,7 +180,7 @@ object OfficialSourceLibrary {
             workedExamplesInApp = ch.solvedExamples.size + ch.detailedTopics.sumOf { it.workedExamples.size },
             theoremsInApp = ch.theorems.size,
             exerciseSetsIndexed = exRefs,
-            enKnParityNote = "EN+KN titles, summaries, definitions & key terms synced with KTBS 2026–27.",
+            enKnParityNote = "Chapter titles and printed page ranges are indexed from both contents pages; detailed translation fidelity has not been independently audited.",
             sourceEditionAndPermission = ch.textbookEdition,
             certificationState = status
         )

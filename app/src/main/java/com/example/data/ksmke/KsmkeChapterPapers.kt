@@ -524,5 +524,8 @@ internal object KsmkeChapterPapers {
                 mistake = "Substituting π = 22/7 early instead of cancelling π on both sides."
             )
         )
-    )
-}
+    ).mapNotNull { (legacyId, questions) ->
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(legacyId) ?: return@mapNotNull null
+        officialId to questions
+    }.toMap()
+}}

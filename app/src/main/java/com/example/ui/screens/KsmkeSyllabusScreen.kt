@@ -384,9 +384,9 @@ private fun DualLibraryArchitectureCard() {
                     ) {
                         Text(
                             if (showChapterAuditRows) {
-                                "Hide Chapter-by-Chapter Missing-Content Report (15 Chapters)"
+                                "Hide Chapter-by-Chapter Missing-Content Report (14 Chapters)"
                             } else {
-                                "View Chapter-by-Chapter Missing-Content Report (Ch 1–15)"
+                                "View Chapter-by-Chapter Missing-Content Report (Ch 1–14)"
                             }
                         )
                     }
@@ -614,7 +614,7 @@ private fun ChapterCard(
                 ) {
                     HorizontalDivider()
                     val chapterAudit = OfficialSourceLibrary.auditChapter(chapter.chapterNumber)
-                    val supplement = KsmkeSupplementLibrary.byChapter[chapter.chapterNumber]
+                    val supplement = KsmkeSupplementLibrary.byOfficialChapter[chapter.chapterNumber]
                     Surface(
                         color = EmeraldChalk.copy(alpha = 0.10f),
                         shape = RoundedCornerShape(10.dp),
