@@ -36,7 +36,7 @@ private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /**
  * Unified AI Gateway supporting:
- * - Google Gemini (Firebase AI Logic with keyless App Check attestation: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-4-argon)
+ * - Google Gemini (Firebase AI Logic with keyless App Check attestation: gemini-3.8-flash, gemini-3.5-flash-lite)
  * - OpenRouter (:free), Groq, Hugging Face Router, Cerebras Free Tier, and Self-Hosted Ollama.
  */
 class OpenWeightAiClient {

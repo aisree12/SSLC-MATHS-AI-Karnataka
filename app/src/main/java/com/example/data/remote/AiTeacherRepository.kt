@@ -37,10 +37,10 @@ class AiTeacherRepository(
 ) {
 
     @Volatile
-    var activeProvider: OpenWeightProvider = OpenWeightProvider.OPENROUTER_FREE
+    var activeProvider: OpenWeightProvider = OpenWeightProvider.GEMINI_API_KEY
 
     @Volatile
-    var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.OPENROUTER_FREE).id
+    var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.GEMINI_API_KEY).id
 
     fun isApiKeyConfigured(): Boolean = openWeightClient.isApiKeyConfigured()
 
