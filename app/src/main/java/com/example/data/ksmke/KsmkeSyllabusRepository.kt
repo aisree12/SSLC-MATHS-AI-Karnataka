@@ -665,7 +665,7 @@ object KsmkeSyllabusRepository {
         )
     }.sortedBy { it.chapterNumber }
 
-    val pyqQuestions: List<PyqQuestion> = listOf(
+    val pyqQuestions: List<PyqQuestion> = (listOf(
         // 1-Mark MCQs (2026-27 MQP-01 & 2019–2025 Board)
         PyqQuestion(
             id = "pyq_2026_mqp_01",
@@ -1221,8 +1221,7 @@ object KsmkeSyllabusRepository {
         )
     ).map { q ->
         q.copy(conceptTag = q.conceptTag.ifBlank { canonicalConceptTagFor(q) })
-    } + PyqArchivePart1.questions + PyqArchivePart2.questions
-    }.map { q ->
+    } + PyqArchivePart1.questions + PyqArchivePart2.questions).map { q ->
         val officialId = if (q.chapterNumber == 6) {
             if (q.topic.contains("tangent", true) || q.questionEn.contains("tangent", true)) 10 else 6
         } else {
