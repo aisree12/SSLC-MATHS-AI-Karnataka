@@ -162,7 +162,7 @@ class AiTeacherRepository(
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, emit)
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, this)
         }
     }
 
@@ -180,7 +180,7 @@ class AiTeacherRepository(
             manager?.getReadyModelFile(spec.modelId) != null
         }
         if (readySpec != null && engine != null) {
-            val notice = "Cloud AI unavailable (network/provider/free-tier quota). Switching to downloaded on-device AI.\\n\\n"
+            val notice = "Cloud AI unavailable (network/provider/free-tier quota). Switching to downloaded on-device AI.\n\n"
             collector.emit(notice)
             try {
                 streamTutorReply(studentMessage, chapterNumber, language, historySummary, readySpec.modelId)
