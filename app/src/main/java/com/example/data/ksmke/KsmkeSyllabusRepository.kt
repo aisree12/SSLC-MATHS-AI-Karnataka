@@ -12,7 +12,7 @@ import com.example.domain.TopicDetailedNote
 
 /**
  * Karnataka SSLC Mathematics Knowledge Engine (KSMKE)
- * Complete 15-chapter KSEAB Class 10 syllabus + verified 2015-2026+ PYQ & Model Paper bank.
+ * Legacy curated content is retained internally; public chapter IDs follow the official 14-chapter 2026–27 structure.
  */
 object KsmkeSyllabusRepository {
 
@@ -40,7 +40,7 @@ object KsmkeSyllabusRepository {
         )
     }
 
-    val chapters: List<KsmkeChapter> = listOf(
+    private val legacyChapters: List<KsmkeChapter> = listOf(
         KsmkeChapter(
             chapterNumber = 1,
             titleEn = "Arithmetic Progressions",
@@ -649,6 +649,22 @@ object KsmkeSyllabusRepository {
         )
     ).map { enrichChapter(it) }
 
+    /** Legacy Constructions content is retained, but is not presented as an official numbered chapter. */
+    val legacyConstructionsContent: KsmkeChapter? =
+        legacyChapters.firstOrNull { it.chapterNumber == 6 }
+
+    val chapters: List<KsmkeChapter> = legacyChapters.mapNotNull { legacy ->
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(legacy.chapterNumber) ?: return@mapNotNull null
+        val official = OfficialSyllabus2026_27.chapter(officialId) ?: return@mapNotNull null
+        legacy.copy(
+            chapterNumber = official.number,
+            titleEn = official.titleEn,
+            titleKn = official.titleKn,
+            textbookEdition = OfficialSyllabus2026_27.edition,
+            pageRange = "English pp. ${official.englishPrintedPages}; Kannada pp. ${official.kannadaPrintedPages}"
+        )
+    }.sortedBy { it.chapterNumber }
+
     val pyqQuestions: List<PyqQuestion> = listOf(
         // 1-Mark MCQs (2026-27 MQP-01 & 2019–2025 Board)
         PyqQuestion(
@@ -1206,6 +1222,14 @@ object KsmkeSyllabusRepository {
     ).map { q ->
         q.copy(conceptTag = q.conceptTag.ifBlank { canonicalConceptTagFor(q) })
     } + PyqArchivePart1.questions + PyqArchivePart2.questions
+    }.map { q ->
+        val officialId = if (q.chapterNumber == 6) {
+            if (q.topic.contains("tangent", true) || q.questionEn.contains("tangent", true)) 10 else 6
+        } else {
+            OfficialSyllabus2026_27.officialIdForLegacy(q.chapterNumber) ?: q.chapterNumber
+        }
+        q.copy(chapterNumber = officialId)
+    }
 
     private fun canonicalConceptTagFor(q: PyqQuestion): String = when {
         q.chapterNumber == 1 && (q.questionEn.contains("sum", true) || q.questionEn.contains("S₁₀", true)) -> "AP Sum of n Terms (Sn)"
