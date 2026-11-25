@@ -61,17 +61,18 @@ class MathVerificationEngineTest {
     }
 
     @Test
-    fun ksmkeSyllabus_hasAll15ChaptersAnd80MarkExamPaper() {
-        assertEquals(15, KsmkeSyllabusRepository.chapters.size)
+    fun ksmkeSyllabus_hasOfficial14ChaptersAnd80MarkExamPaper() {
+        assertEquals(14, KsmkeSyllabusRepository.chapters.size)
+        assertEquals((1..14).toList(), KsmkeSyllabusRepository.chapters.map { it.chapterNumber })
         val fullPaper = KsmkeSyllabusRepository.buildExamPaper(ExamMode.FULL_BOARD_80)
         assertEquals(38, fullPaper.size)
         assertEquals(80, fullPaper.sumOf { it.marks })
     }
 
     @Test
-    fun ksmkeDetailedTopicsAndChapterPapers_coverAll15ChaptersAndSourceMapping() {
+    fun ksmkeDetailedTopicsAndChapterPapers_coverOfficialChaptersAndSourceMapping() {
         KsmkeSyllabusRepository.chapters.forEach { ch ->
-            assertTrue("Chapter ${ch.chapterNumber} missing detailedTopics", ch.detailedTopics.isNotEmpty())
+            assertNotNull("Chapter ${ch.chapterNumber} missing official syllabus entry", OfficialSyllabus2026_27.chapter(ch.chapterNumber))
             ch.detailedTopics.forEach { topic ->
                 assertTrue(topic.coreConcepts.isNotEmpty())
                 assertTrue(topic.formulasAndRules.isNotEmpty())
@@ -107,7 +108,12 @@ class MathVerificationEngineTest {
         val full = IndependentMarkingEngine.evaluateWrittenSolution(
             questionEn = "Find the distance between (2, 3) and (4, 1)",
             officialAnswer = "2.83 units",
-            markingPoints = listOf("Formula", "Substitute", "Answer"),
+            markingPoints = listOf(
+                "Given coordinates 2, 3, 4, 1 (0.5M)",
+                "Distance formula sqrt (0.5M)",
+                "Substitute coordinate values 2, 3, 4, 1 (0.5M)",
+                "Final answer 2.83 units (0.5M)"
+            ),
             maxMarks = 2,
             studentSteps = "Given: (2, 3) and (4, 1)\nFormula: d = sqrt((x2-x1)^2+(y2-y1)^2)\nStep: d = sqrt(8) = 2.83 units",
             conceptTag = "Distance Formula"
@@ -170,7 +176,9 @@ class MathVerificationEngineTest {
         val geminiModels = OpenWeightModelCatalog.modelsFor(OpenWeightProvider.GEMINI)
         assertTrue(geminiModels.any { it.id == "gemini-3.8-flash" && it.supportsVision })
         assertTrue(geminiModels.any { it.id == "gemini-3.5-flash-lite" && it.supportsVision })
-        assertTrue(geminiModels.any { it.id == "gemini-4-argon" && it.supportsVision })
+        assertFalse(geminiModels.any { it.id == "gemini-4-argon" })
+        assertTrue(OpenWeightProvider.GEMINI_API_KEY.requiresApiKey)
+        assertEquals(listOf("gemini-3.8-flash", "gemini-3.5-flash-lite"), OpenWeightModelCatalog.modelsFor(OpenWeightProvider.GEMINI_API_KEY).map { it.id })
 
         assertTrue(OpenWeightProvider.ON_DEVICE_OFFLINE.runsOnPhoneHardware)
         assertFalse(OpenWeightProvider.ON_DEVICE_OFFLINE.requiresApiKey)
@@ -183,7 +191,7 @@ class MathVerificationEngineTest {
         assertEquals(6, audit.size)
         val ch2 = KsmkeSyllabusRepository.getChapter(2)
         val ch4 = KsmkeSyllabusRepository.getChapter(4)
-        assertEquals(5, ch2.theorems.size + ch4.theorems.size)
+        assertEquals(5, KsmkeSyllabusRepository.getChapter(6).theorems.size + KsmkeSyllabusRepository.getChapter(10).theorems.size)
 
         val jsonSlice = OpenWeightAiClient.extractJsonString(
             "<think>reasoning steps</think>\n```json\n{\"questions\": [{\"marks\": 2}]}\n```"
