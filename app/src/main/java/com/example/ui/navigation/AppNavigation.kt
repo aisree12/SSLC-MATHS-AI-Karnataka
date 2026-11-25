@@ -27,6 +27,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -47,11 +50,14 @@ import com.example.core.authStateFlow
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.local.AppDatabase
 import com.example.data.local.LocalProgressRepository
+import com.example.data.local.OnDeviceLlmEngine
+import com.example.data.local.OnDeviceModelManager
 import com.example.data.remote.AiTeacherRepository
 import com.example.data.remote.FirestoreSyncRepository
 import com.example.ui.SslcStudyViewModel
 import com.example.ui.screens.AiTeacherScreen
 import com.example.ui.screens.AuthScreen
+import com.example.ui.screens.CinematicIntroScreen
 import com.example.ui.screens.CoachProfileScreen
 import com.example.ui.screens.FullMarksAcademyScreen
 import com.example.ui.screens.KsmkeSyllabusScreen
@@ -92,10 +98,19 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
         AuthScreen(onAuthSuccess = {})
     } else {
         key(user.uid) {
-            MainStudyWorkspace(
-                currentUserId = user.uid,
-                displayName = user.displayName ?: "SSLC Scholar"
-            )
+            var showIntroSplash by rememberSaveable(user.uid) { mutableStateOf(true) }
+            if (showIntroSplash) {
+                CinematicIntroScreen(
+                    studentName = user.displayName ?: "SSLC Scholar",
+                    onEnterClassroom = { showIntroSplash = false }
+                )
+            } else {
+                MainStudyWorkspace(
+                    currentUserId = user.uid,
+                    displayName = user.displayName ?: "SSLC Scholar",
+                    onReplayIntro = { showIntroSplash = true }
+                )
+            }
         }
     }
 }
@@ -103,7 +118,8 @@ fun AppNavigation(auth: FirebaseAuth = Firebase.auth) {
 @Composable
 private fun MainStudyWorkspace(
     currentUserId: String,
-    displayName: String
+    displayName: String,
+    onReplayIntro: () -> Unit
 ) {
     val studyViewModel: SslcStudyViewModel = viewModel(
         key = currentUserId,
@@ -115,12 +131,18 @@ private fun MainStudyWorkspace(
                 val databaseId = app.getString(R.string.firestore_database_id)
                 val db = FirebaseFirestore.getInstance(databaseId)
                 val localDb = AppDatabase.getInstance(app)
+                val onDeviceModelManager = OnDeviceModelManager(app)
+                val onDeviceLlmEngine = OnDeviceLlmEngine(app)
                 SslcStudyViewModel(
                     firestoreSync = FirestoreSyncRepository(db),
                     localProgress = LocalProgressRepository(localDb.studyProgressDao()),
-                    aiTeacher = AiTeacherRepository(),
+                    aiTeacher = AiTeacherRepository(
+                        onDeviceModelManager = onDeviceModelManager,
+                        onDeviceLlmEngine = onDeviceLlmEngine
+                    ),
                     currentUserId = currentUserId,
-                    initialDisplayName = displayName
+                    initialDisplayName = displayName,
+                    onDeviceModelManager = onDeviceModelManager
                 )
             }
         }
@@ -233,6 +255,7 @@ private fun MainStudyWorkspace(
                         CoachProfileScreen(
                             viewModel = studyViewModel,
                             studentName = displayName,
+                            onReplayIntro = onReplayIntro,
                             onSignedOut = {}
                         )
                     }

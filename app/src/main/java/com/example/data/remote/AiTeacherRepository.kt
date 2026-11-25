@@ -3,6 +3,8 @@ package com.example.data.remote
 import android.graphics.Bitmap
 import android.util.Log
 import com.example.data.ksmke.KsmkeSyllabusRepository
+import com.example.data.local.OnDeviceLlmEngine
+import com.example.data.local.OnDeviceModelManager
 import com.example.domain.ChapterQuestionPaper
 import com.example.domain.DifficultyLevel
 import com.example.domain.MathVerificationEngine
@@ -21,12 +23,15 @@ import kotlinx.coroutines.withTimeout
 private const val TAG = "AiTeacherRepo"
 
 /**
- * SSLC Mathematics AI Teacher Repository powered exclusively by free open-weight
- * OpenAI-compatible models (Qwen 2.5 / Qwen 3 / Qwen 2.5-VL, DeepSeek R1, Llama 3.3,
- * Mistral, and Local Ollama) plus deterministic offline KSMKE fallback.
+ * SSLC Mathematics AI Teacher Repository powered by:
+ * 1. Real Android On-Device Offline AI (MediaPipe LlmInference running downloaded quantised Qwen2.5 .task weights),
+ * 2. Free open-weight OpenAI-compatible cloud providers (OpenRouter :free, Groq, Hugging Face, Cerebras), and
+ * 3. Deterministic Rule-Based KSMKE + MathVerificationEngine study guide.
  */
 class AiTeacherRepository(
-    private val openWeightClient: OpenWeightAiClient = OpenWeightAiClient()
+    private val openWeightClient: OpenWeightAiClient = OpenWeightAiClient(),
+    private val onDeviceModelManager: OnDeviceModelManager? = null,
+    private val onDeviceLlmEngine: OnDeviceLlmEngine? = null
 ) {
 
     @Volatile
@@ -36,6 +41,43 @@ class AiTeacherRepository(
     var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.OPENROUTER_FREE).id
 
     fun isApiKeyConfigured(): Boolean = openWeightClient.isApiKeyConfigured()
+
+    private fun requireReadyOnDeviceModelFile(): java.io.File {
+        val manager = onDeviceModelManager
+            ?: throw IllegalStateException("On-device model manager is not initialized.")
+        val spec = OpenWeightModelCatalog.findOnDeviceSpec(activeModelId)
+        return manager.getReadyModelFile(spec.modelId)
+            ?: throw IllegalStateException(
+                "${spec.displayName} (${spec.approxSizeLabel}) is not downloaded on this phone yet. " +
+                    "Tap 'Download Quantised Model' below the AI Model menu (or import a .task file) for true offline AI."
+            )
+    }
+
+    private suspend fun executeTextPrompt(
+        systemInstruction: String,
+        userPrompt: String
+    ): String {
+        if (activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+            val engine = onDeviceLlmEngine
+                ?: throw IllegalStateException("On-device MediaPipe LLM runtime is not available.")
+            val modelFile = requireReadyOnDeviceModelFile()
+            return withTimeout(120_000L) {
+                engine.complete(
+                    modelFile = modelFile,
+                    systemInstruction = systemInstruction,
+                    userPrompt = userPrompt
+                )
+            }
+        }
+        return withTimeout(60_000L) {
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = systemInstruction,
+                userPrompt = userPrompt
+            )
+        }
+    }
 
     private val gurujiSystemPrompt = """
         You are "Guruji", a patient, warm, encouraging Karnataka SSLC Class 10 Mathematics AI Teacher.
@@ -84,6 +126,17 @@ class AiTeacherRepository(
             appendLine("Student says: $studentMessage")
         }
 
+        if (activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+            val engine = onDeviceLlmEngine
+                ?: throw IllegalStateException("On-device MediaPipe LLM runtime is not initialized.")
+            val modelFile = requireReadyOnDeviceModelFile()
+            return engine.streamCompletion(
+                modelFile = modelFile,
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
+        }
+
         return openWeightClient.streamChatCompletion(
             provider = activeProvider,
             modelId = activeModelId,
@@ -122,14 +175,10 @@ class AiTeacherRepository(
             $langHint
         """.trimIndent()
 
-        return withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = gurujiSystemPrompt,
-                userPrompt = prompt
-            )
-        }
+        return executeTextPrompt(
+            systemInstruction = gurujiSystemPrompt,
+            userPrompt = prompt
+        )
     }
 
     suspend fun generatePracticeQuestions(
@@ -159,14 +208,10 @@ class AiTeacherRepository(
             }
         """.trimIndent()
 
-        val rawText = withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
-                userPrompt = prompt
-            )
-        }
+        val rawText = executeTextPrompt(
+            systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
+            userPrompt = prompt
+        )
         val root = OpenWeightAiClient.extractJsonObject(rawText)
         val array = root.getJSONArray("questions")
         val format = when (marks) {
@@ -229,14 +274,10 @@ class AiTeacherRepository(
             Use crisp plain formatting and Unicode math symbols (x², √, Δ, ∠, △, π, θ). Do NOT use LaTeX dollar signs.
         """.trimIndent()
 
-        return withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = gurujiSystemPrompt,
-                userPrompt = prompt
-            )
-        }
+        return executeTextPrompt(
+            systemInstruction = gurujiSystemPrompt,
+            userPrompt = prompt
+        )
     }
 
     suspend fun generateChapterQuestionPaperAi(
@@ -287,14 +328,10 @@ class AiTeacherRepository(
             }
         """.trimIndent()
 
-        val rawText = withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
-                userPrompt = prompt
-            )
-        }
+        val rawText = executeTextPrompt(
+            systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
+            userPrompt = prompt
+        )
         val root = OpenWeightAiClient.extractJsonObject(rawText)
         val qArr = root.getJSONArray("questions")
         val questions = (0 until qArr.length()).map { idx ->
@@ -391,14 +428,10 @@ class AiTeacherRepository(
             """.trimIndent()
         }
 
-        return withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = gurujiSystemPrompt,
-                userPrompt = prompt
-            )
-        }
+        return executeTextPrompt(
+            systemInstruction = gurujiSystemPrompt,
+            userPrompt = prompt
+        )
     }
 
     suspend fun analyzeScannedSolution(
@@ -455,6 +488,12 @@ class AiTeacherRepository(
             appendLine(langInstruction)
         }
 
+        if (activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+            throw IllegalStateException(
+                "Downloaded on-device Qwen2.5 INT8 models are text-only. To analyze handwritten camera photos, select a Vision model (such as Qwen 2.5 VL Vision) from the top-right AI Model menu."
+            )
+        }
+
         return withTimeout(60_000L) {
             openWeightClient.analyzeImageWithVisionModel(
                 provider = activeProvider,
@@ -499,6 +538,10 @@ class AiTeacherRepository(
         }.orEmpty()
 
         return "$header\n\nKey Formulas:\n• ${ch.keyFormulas.joinToString("\n• ")}$stepsText$mathCheck\n\nTry answering: ${ch.starterQuestion}"
+    }
+
+    fun releaseOnDeviceEngine() {
+        onDeviceLlmEngine?.release()
     }
 
     fun formatAiError(error: Throwable): String {

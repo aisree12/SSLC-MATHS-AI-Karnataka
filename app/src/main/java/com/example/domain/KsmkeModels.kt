@@ -239,12 +239,57 @@ data class StudyPlanSlot(
     val rationale: String
 )
 
+enum class SyllabusCertificationState(val label: String) {
+    FRAMEWORK_INDEXED("Framework Indexed (Partial Corpus)"),
+    PARTIAL_CURATED("Curated Notes + Proofs (Exercises Pending)"),
+    CERTIFIED_COMPLETE("Certified & Audit Passed (All 15 Chapters, pp. 1–342)")
+}
+
+enum class CorpusCriterionStatus(val label: String) {
+    VERIFIED_IN_APP("Verified & Passed"),
+    PARTIAL_CURATED("Curated / Partial"),
+    PENDING_EXTERNAL_CORPUS("Pending Full KTBS Corpus")
+}
+
+data class CorpusAuditCriterion(
+    val id: String,
+    val title: String,
+    val status: CorpusCriterionStatus,
+    val detail: String
+)
+
+data class ChapterCorpusAudit(
+    val chapterNumber: Int,
+    val ktbsPageRange: String,
+    val topicCount: Int,
+    val workedExamplesInApp: Int,
+    val theoremsInApp: Int,
+    val exerciseSetsIndexed: String,
+    val enKnParityNote: String,
+    val sourceEditionAndPermission: String,
+    val certificationState: SyllabusCertificationState
+)
+
 enum class OpenWeightProvider(
     val displayName: String,
     val chatCompletionsUrl: String,
     val requiresApiKey: Boolean,
-    val badge: String
+    val badge: String,
+    val runsOnPhoneHardware: Boolean = false
 ) {
+    GEMINI(
+        displayName = "Google Gemini (Firebase AI)",
+        chatCompletionsUrl = "",
+        requiresApiKey = false,
+        badge = "Keyless App Check • Text + Vision"
+    ),
+    ON_DEVICE_OFFLINE(
+        displayName = "On-Device AI (Offline Phone)",
+        chatCompletionsUrl = "",
+        requiresApiKey = false,
+        badge = "MediaPipe Quantised Offline",
+        runsOnPhoneHardware = true
+    ),
     OPENROUTER_FREE(
         displayName = "OpenRouter (:free)",
         chatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions",
@@ -269,11 +314,11 @@ enum class OpenWeightProvider(
         requiresApiKey = true,
         badge = "Fast Qwen / Llama"
     ),
-    LOCAL_OLLAMA(
-        displayName = "Local Ollama (No Key)",
+    SELF_HOSTED_OLLAMA(
+        displayName = "Ollama (Self-Hosted LAN)",
         chatCompletionsUrl = "http://10.0.2.2:11434/v1/chat/completions",
         requiresApiKey = false,
-        badge = "Zero-Cost Self-Hosted"
+        badge = "External Host Server"
     )
 }
 
@@ -285,8 +330,48 @@ data class OpenWeightModelSpec(
     val supportsVision: Boolean = false
 )
 
+data class OnDeviceQuantizedModelSpec(
+    val modelId: String,
+    val displayName: String,
+    val fileName: String,
+    val downloadUrl: String,
+    val approxSizeLabel: String,
+    val approxBytes: Long,
+    val minRamGb: Int
+)
+
 object OpenWeightModelCatalog {
+    val onDeviceQuantizedModels: List<OnDeviceQuantizedModelSpec> = listOf(
+        OnDeviceQuantizedModelSpec(
+            modelId = "qwen2.5-0.5b-q8-ondevice",
+            displayName = "Qwen 2.5 0.5B INT8 (Fast Offline)",
+            fileName = "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            approxSizeLabel = "~560 MB",
+            approxBytes = 560L * 1024L * 1024L,
+            minRamGb = 4
+        ),
+        OnDeviceQuantizedModelSpec(
+            modelId = "qwen2.5-1.5b-q8-ondevice",
+            displayName = "Qwen 2.5 1.5B INT8 (Math Accurate)",
+            fileName = "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            downloadUrl = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
+            approxSizeLabel = "~1.6 GB",
+            approxBytes = 1600L * 1024L * 1024L,
+            minRamGb = 6
+        )
+    )
+
     val models: List<OpenWeightModelSpec> = listOf(
+        // Google Gemini via Firebase AI Logic (Keyless App Check)
+        OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (Vision + Fast)", "Gemini 3", OpenWeightProvider.GEMINI, supportsVision = true),
+        OpenWeightModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (Ultra Fast)", "Gemini 3 Lite", OpenWeightProvider.GEMINI, supportsVision = true),
+        OpenWeightModelSpec("gemini-4-argon", "Gemini 4 Argon (STEM & Proofs)", "Gemini 4", OpenWeightProvider.GEMINI, supportsVision = true),
+
+        // Real On-Device MediaPipe LiteRT Quantised Models
+        OpenWeightModelSpec("qwen2.5-0.5b-q8-ondevice", "Qwen 2.5 0.5B INT8 (On-Device ~560 MB)", "Qwen On-Device", OpenWeightProvider.ON_DEVICE_OFFLINE),
+        OpenWeightModelSpec("qwen2.5-1.5b-q8-ondevice", "Qwen 2.5 1.5B INT8 (On-Device ~1.6 GB)", "Qwen On-Device", OpenWeightProvider.ON_DEVICE_OFFLINE),
+
         // OpenRouter :free models
         OpenWeightModelSpec("qwen/qwen3-235b-a22b:free", "Qwen 3 235B (Free)", "Qwen", OpenWeightProvider.OPENROUTER_FREE),
         OpenWeightModelSpec("qwen/qwen-2.5-72b-instruct:free", "Qwen 2.5 72B (Free)", "Qwen", OpenWeightProvider.OPENROUTER_FREE),
@@ -309,21 +394,25 @@ object OpenWeightModelCatalog {
         OpenWeightModelSpec("qwen-3-32b", "Qwen 3 32B (Cerebras Free)", "Qwen", OpenWeightProvider.CEREBRAS_FREE),
         OpenWeightModelSpec("llama-3.3-70b", "Llama 3.3 70B (Cerebras Free)", "Llama", OpenWeightProvider.CEREBRAS_FREE),
 
-        // Local Ollama (zero-key)
-        OpenWeightModelSpec("qwen2.5-math:7b", "Qwen 2.5 Math 7B (Local)", "Qwen", OpenWeightProvider.LOCAL_OLLAMA),
-        OpenWeightModelSpec("qwen2.5vl:7b", "Qwen 2.5 VL Vision (Local)", "Qwen Vision", OpenWeightProvider.LOCAL_OLLAMA, supportsVision = true),
-        OpenWeightModelSpec("deepseek-r1:7b", "DeepSeek R1 7B (Local)", "DeepSeek", OpenWeightProvider.LOCAL_OLLAMA)
+        // Self-Hosted Ollama (External Dev / LAN Server — requires running Ollama host)
+        OpenWeightModelSpec("qwen2.5-math:7b", "Qwen 2.5 Math 7B (Ollama LAN)", "Qwen", OpenWeightProvider.SELF_HOSTED_OLLAMA),
+        OpenWeightModelSpec("qwen2.5vl:7b", "Qwen 2.5 VL Vision (Ollama LAN)", "Qwen Vision", OpenWeightProvider.SELF_HOSTED_OLLAMA, supportsVision = true),
+        OpenWeightModelSpec("deepseek-r1:7b", "DeepSeek R1 7B (Ollama LAN)", "DeepSeek", OpenWeightProvider.SELF_HOSTED_OLLAMA)
     )
 
     fun modelsFor(provider: OpenWeightProvider): List<OpenWeightModelSpec> =
         models.filter { it.provider == provider }
 
+    fun findOnDeviceSpec(modelId: String): OnDeviceQuantizedModelSpec =
+        onDeviceQuantizedModels.firstOrNull { it.modelId == modelId } ?: onDeviceQuantizedModels.first()
+
     fun defaultTextModel(provider: OpenWeightProvider): OpenWeightModelSpec =
-        models.firstOrNull { it.provider == provider && !it.supportsVision } ?: models.first()
+        models.firstOrNull { it.provider == provider && (!it.supportsVision || provider == OpenWeightProvider.GEMINI) }
+            ?: models.first()
 
     fun defaultVisionModel(provider: OpenWeightProvider): OpenWeightModelSpec =
         models.firstOrNull { it.provider == provider && it.supportsVision }
-            ?: OpenWeightModelSpec("qwen/qwen2.5-vl-72b-instruct:free", "Qwen 2.5 VL Vision (Free)", "Qwen Vision", OpenWeightProvider.OPENROUTER_FREE, supportsVision = true)
+            ?: OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (Vision + Fast)", "Gemini 3", OpenWeightProvider.GEMINI, supportsVision = true)
 }
 
 

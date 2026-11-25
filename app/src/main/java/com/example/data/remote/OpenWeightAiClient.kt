@@ -6,12 +6,18 @@ import android.util.Log
 import com.example.BuildConfig
 import com.example.domain.OpenWeightModelCatalog
 import com.example.domain.OpenWeightProvider
+import com.google.firebase.Firebase
+import com.google.firebase.ai.GenerativeModel
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.content
+import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -20,6 +26,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "OpenWeightAiClient"
@@ -27,9 +34,9 @@ private const val PLACEHOLDER_KEY = "MY_FREE_OPEN_AI_API_KEY"
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /**
- * Pure OpenAI-compatible HTTP client supporting free open-weight models
- * (Qwen 2.5 / Qwen 3 / Qwen 2.5-VL, DeepSeek R1, Llama 3.3/4, Mistral, and Local Ollama)
- * with zero paid proprietary AI SDK dependencies.
+ * Unified AI Gateway supporting:
+ * - Google Gemini (Firebase AI Logic with keyless App Check attestation: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-4-argon)
+ * - OpenRouter (:free), Groq, Hugging Face Router, Cerebras Free Tier, and Self-Hosted Ollama.
  */
 class OpenWeightAiClient {
 
@@ -38,6 +45,24 @@ class OpenWeightAiClient {
         .readTimeout(60, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    // Lazy cache so Firebase.ai is never evaluated at class construction time.
+    private val geminiModels = ConcurrentHashMap<Pair<String, String>, GenerativeModel>()
+
+    private fun getOrCreateGeminiModel(modelId: String, systemInstruction: String): GenerativeModel {
+        return geminiModels.getOrPut(modelId to systemInstruction) {
+            Firebase.ai.generativeModel(
+                modelName = modelId,
+                generationConfig = generationConfig {
+                    temperature = 0.35f
+                    maxOutputTokens = 2048
+                },
+                systemInstruction = if (systemInstruction.isNotBlank()) {
+                    content { text(systemInstruction) }
+                } else null
+            )
+        }
+    }
 
     fun isApiKeyConfigured(): Boolean {
         val key = BuildConfig.OPENAI_COMPAT_API_KEY.trim()
@@ -53,6 +78,36 @@ class OpenWeightAiClient {
         ensureProviderReady(provider)
         val candidates = candidateModelsFor(provider, modelId, requireVision = false)
         var lastError: Throwable? = null
+
+        if (provider == OpenWeightProvider.GEMINI) {
+            for (candidate in candidates) {
+                try {
+                    val model = getOrCreateGeminiModel(candidate, systemInstruction)
+                    val accumulated = StringBuilder()
+                    withTimeout(60_000L) {
+                        model.generateContentStream(userPrompt).collect { chunk ->
+                            val delta = chunk.text.orEmpty()
+                            if (delta.isNotEmpty()) {
+                                accumulated.append(delta)
+                                val cleaned = stripThinkingBlocks(accumulated.toString())
+                                if (cleaned.isNotBlank()) {
+                                    emit(cleaned)
+                                }
+                            }
+                        }
+                    }
+                    val finalOut = stripThinkingBlocks(accumulated.toString())
+                    if (finalOut.isNotBlank()) return@flow
+                    lastError = IOException("Gemini model $candidate returned an empty streamed reply.")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastError = e
+                    Log.w(TAG, "Gemini candidate $candidate failed: ${e.message}")
+                }
+            }
+            throw lastError ?: IOException("Gemini streaming failed.")
+        }
 
         for (candidate in candidates) {
             try {
@@ -108,7 +163,7 @@ class OpenWeightAiClient {
             }
         }
 
-        throw lastError ?: IOException("All free open-weight models failed for ${provider.displayName}.")
+        throw lastError ?: IOException("All free models failed for ${provider.displayName}.")
     }.flowOn(Dispatchers.IO)
 
     suspend fun completeChat(
@@ -120,6 +175,26 @@ class OpenWeightAiClient {
         ensureProviderReady(provider)
         val candidates = candidateModelsFor(provider, modelId, requireVision = false)
         var lastError: Throwable? = null
+
+        if (provider == OpenWeightProvider.GEMINI) {
+            for (candidate in candidates) {
+                try {
+                    val model = getOrCreateGeminiModel(candidate, systemInstruction)
+                    val response = withTimeout(60_000L) {
+                        model.generateContent(userPrompt)
+                    }
+                    val text = stripThinkingBlocks(response.text.orEmpty())
+                    if (text.isNotBlank()) return@withContext text
+                    lastError = IOException("Empty completion from Gemini $candidate")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastError = e
+                    Log.w(TAG, "Gemini completion $candidate failed: ${e.message}")
+                }
+            }
+            throw lastError ?: IOException("Failed to get completion from Google Gemini.")
+        }
 
         for (candidate in candidates) {
             try {
@@ -166,8 +241,35 @@ class OpenWeightAiClient {
             .map { it.id }
             .ifEmpty { listOf(visionModel) }
 
-        val dataUri = bitmapToDataUri(bitmap)
         var lastError: Throwable? = null
+
+        if (provider == OpenWeightProvider.GEMINI) {
+            val safeBitmap = scaleBitmapForPayload(bitmap)
+            for (candidate in fallbackVision) {
+                try {
+                    val model = getOrCreateGeminiModel(candidate, systemInstruction)
+                    val response = withTimeout(60_000L) {
+                        model.generateContent(
+                            content {
+                                image(safeBitmap)
+                                text(userPrompt)
+                            }
+                        )
+                    }
+                    val text = stripThinkingBlocks(response.text.orEmpty())
+                    if (text.isNotBlank()) return@withContext text
+                    lastError = IOException("Empty Gemini vision response from $candidate")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    lastError = e
+                    Log.w(TAG, "Gemini vision candidate $candidate failed: ${e.message}")
+                }
+            }
+            throw lastError ?: IOException("Vision analysis failed on Google Gemini.")
+        }
+
+        val dataUri = bitmapToDataUri(bitmap)
 
         for (candidate in fallbackVision) {
             try {
@@ -224,12 +326,28 @@ class OpenWeightAiClient {
         throw lastError ?: IOException("Vision analysis failed on ${provider.displayName}")
     }
 
+    private fun scaleBitmapForPayload(bitmap: Bitmap, maxDim: Int = 1440): Bitmap {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (w <= maxDim && h <= maxDim) return bitmap
+        val ratio = minOf(maxDim.toFloat() / w.toFloat(), maxDim.toFloat() / h.toFloat())
+        return Bitmap.createScaledBitmap(
+            bitmap,
+            (w * ratio).toInt().coerceAtLeast(1),
+            (h * ratio).toInt().coerceAtLeast(1),
+            true
+        )
+    }
+
     private fun ensureProviderReady(provider: OpenWeightProvider) {
+        if (provider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+            throw IllegalStateException("On-Device Offline AI runs locally via MediaPipe, not HTTP.")
+        }
         if (provider.requiresApiKey && !isApiKeyConfigured()) {
             throw IllegalStateException(
                 "Free API key missing for ${provider.displayName}. " +
-                    "Add a free OpenRouter/Groq/HuggingFace key to OPENAI_COMPAT_API_KEY in the Secrets panel, " +
-                    "or use Local Ollama / Offline KSMKE Guide."
+                    "Add a free OpenRouter/Groq/HuggingFace/Cerebras key to OPENAI_COMPAT_API_KEY in Secrets, " +
+                    "or select Google Gemini (Keyless Firebase AI) or On-Device AI from the AI Model menu."
             )
         }
     }

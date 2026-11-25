@@ -25,9 +25,9 @@ object AiTeachingLibrary {
     )
 
     val sixLayerEngine: List<KsmkeLayerSpec> = listOf(
-        KsmkeLayerSpec(1, "Textbook Layer", "Page-verified KTBS concepts, definitions, and exercise coverage (pp. 1–342)."),
+        KsmkeLayerSpec(1, "Textbook Layer", "Curated 29-topic KTBS study notes, all 5 core SSLC theorem proofs, and page/exercise reference index (full verbatim pages pending external corpus)."),
         KsmkeLayerSpec(2, "Mathematics Layer", "Exact formulas, derivations, proofs, and deterministic MathVerificationEngine checks."),
-        KsmkeLayerSpec(3, "Examination Layer", "2015–2027 KSEAB 81E archive and 80M/38Q Model Question Paper pattern mapping."),
+        KsmkeLayerSpec(3, "Examination Layer", "2015–2026 KSEAB 81E curated PYQ bank (61+ items) and 80M/38Q 2026-27 Model Question Paper blueprint."),
         KsmkeLayerSpec(4, "Marking Layer", "IndependentMarkingEngine 5-pillar KSEAB step scoring (Given, Formula, Steps, Answer, Units)."),
         KsmkeLayerSpec(5, "Psychology Layer", "Encouraging non-judgmental feedback, confidence scoring, and exam calm coaching."),
         KsmkeLayerSpec(6, "Methodology Layer", "10-step Socratic bilingual (English + Kannada) explanation and concept repair drills.")

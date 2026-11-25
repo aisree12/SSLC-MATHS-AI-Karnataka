@@ -31,6 +31,15 @@ object KsmkeSyllabusRepository {
                 } else note
             }
 
+    private fun enrichChapter(ch: KsmkeChapter): KsmkeChapter {
+        val supp = KsmkeSupplementLibrary.byChapter[ch.chapterNumber]
+        val extraExamples = listOfNotNull(supp?.supplementaryWorkedExample)
+        return ch.copy(
+            solvedExamples = (ch.solvedExamples + extraExamples).distinctBy { it.title },
+            detailedTopics = detailedTopicsFor(ch.chapterNumber)
+        )
+    }
+
     val chapters: List<KsmkeChapter> = listOf(
         KsmkeChapter(
             chapterNumber = 1,
@@ -96,6 +105,32 @@ object KsmkeSyllabusRepository {
                         "3. Ratio 1 (1M): ar(△ADE)/ar(△BDE) = (½·AD·EN)/(½·DB·EN) = AD/DB.",
                         "4. Ratio 2 (1M): ar(△ADE)/ar(△CDE) = (½·AE·DM)/(½·EC·DM) = AE/EC.",
                         "5. Conclusion (0.5M): △BDE and △CDE lie on same base DE between parallels DE || BC ⇒ ar(△BDE) = ar(△CDE). Hence AD/DB = AE/EC."
+                    ),
+                    marksWeight = 4
+                ),
+                TheoremCard(
+                    name = "AAA / AA Similarity & Areas of Similar Triangles",
+                    kannadaName = "ತ್ರಿಭುಜಗಳ ಸಮರೂಪತೆ ಮತ್ತು ವಿಸ್ತೀರ್ಣಗಳ ಅನುಪಾತದ ಪ್ರಮೇಯ",
+                    statement = "The ratio of the areas of two similar triangles is equal to the square of the ratio of their corresponding sides.",
+                    keyProofSteps = listOf(
+                        "1. Data: △ABC ~ △PQR; draw altitudes AM ⊥ BC and PN ⊥ QR.",
+                        "2. Areas Ratio: ar(△ABC)/ar(△PQR) = (½·BC·AM)/(½·QR·PN) = (BC/QR)·(AM/PN).",
+                        "3. AA Similarity of Right △s: In △ABM and △PQN, ∠B = ∠Q (given similarity) and ∠M = ∠N = 90° ⇒ △ABM ~ △PQN.",
+                        "4. Altitude Ratio: Hence AM/PN = AB/PQ = BC/QR (corresponding sides).",
+                        "5. Conclusion: Substitute back ⇒ ar(△ABC)/ar(△PQR) = (BC/QR)² = (AB/PQ)² = (AC/PR)²."
+                    ),
+                    marksWeight = 4
+                ),
+                TheoremCard(
+                    name = "Pythagoras Theorem (Reference Proof)",
+                    kannadaName = "ಪೈಥಾಗೊರಸ್ ಪ್ರಮೇಯ",
+                    statement = "In a right triangle, the square of the hypotenuse is equal to the sum of the squares of the other two sides.",
+                    keyProofSteps = listOf(
+                        "1. Data & Construction: Right △ABC with ∠B = 90°; draw BD ⊥ AC.",
+                        "2. First Similarity: △ADB ~ △ABC (∠A common, ∠ADB = ∠ABC = 90°) ⇒ AD/AB = AB/AC ⇒ AB² = AD·AC ...(1).",
+                        "3. Second Similarity: △BDC ~ △ABC (∠C common, ∠BDC = ∠ABC = 90°) ⇒ CD/BC = BC/AC ⇒ BC² = CD·AC ...(2).",
+                        "4. Add (1) & (2): AB² + BC² = AD·AC + CD·AC = AC(AD + CD).",
+                        "5. Since AD + CD = AC, AB² + BC² = AC² (Hence Proved)."
                     ),
                     marksWeight = 4
                 )
@@ -172,7 +207,20 @@ object KsmkeSyllabusRepository {
             ),
             theorems = listOf(
                 TheoremCard(
-                    name = "Tangents from an External Point",
+                    name = "Theorem 4.1: Tangent Perpendicular to Radius",
+                    kannadaName = "ಪ್ರಮೇಯ 4.1: ಸ್ಪರ್ಶಕ ಮತ್ತು ತ್ರಿಜ್ಯದ ಲಂಬತೆ",
+                    statement = "The tangent at any point of a circle is perpendicular to the radius through the point of contact.",
+                    keyProofSteps = listOf(
+                        "1. Data: Circle with centre O, tangent XY touching circle at point P, radius OP.",
+                        "2. To Prove: OP ⊥ XY.",
+                        "3. Construction: Take any point Q on XY other than P and join OQ.",
+                        "4. Reasoning: Since Q lies outside the circle (tangent touches at one point P only), OQ > radius OP.",
+                        "5. Conclusion: This holds for every Q ≠ P on XY ⇒ OP is the shortest distance from O to line XY ⇒ OP ⊥ XY."
+                    ),
+                    marksWeight = 2
+                ),
+                TheoremCard(
+                    name = "Theorem 4.2: Tangents from an External Point",
                     kannadaName = "ಬಾಹ್ಯ ಬಿಂದುವಿನಿಂದ ವೃತ್ತಕ್ಕೆ ಎಳೆದ ಸ್ಪರ್ಶಕಗಳ ಪ್ರಮೇಯ",
                     statement = "The lengths of tangents drawn from an external point to a circle are equal.",
                     keyProofSteps = listOf(
@@ -599,7 +647,7 @@ object KsmkeSyllabusRepository {
             ),
             starterQuestion = "Why do we add CSA of cone and CSA of hemisphere instead of TSA?"
         )
-    ).map { it.copy(detailedTopics = detailedTopicsFor(it.chapterNumber)) }
+    ).map { enrichChapter(it) }
 
     val pyqQuestions: List<PyqQuestion> = listOf(
         // 1-Mark MCQs (2026-27 MQP-01 & 2019–2025 Board)

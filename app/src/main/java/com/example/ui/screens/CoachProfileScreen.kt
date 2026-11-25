@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Schedule
@@ -66,6 +68,7 @@ fun CoachProfileScreen(
     viewModel: SslcStudyViewModel,
     studentName: String,
     onSignedOut: () -> Unit,
+    onReplayIntro: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -466,6 +469,59 @@ fun CoachProfileScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+            }
+        }
+
+        // Developer & App Credits Card
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = IndigoInk),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("profile_developer_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Code,
+                            contentDescription = "Developer",
+                            tint = SaffronGold,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Developer: SVANAM",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+                    }
+                    Text(
+                        text = "Phone: 6360953674 • City: VIJAYAPUR",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFFE2E8F0)
+                    )
+                    OutlinedButton(
+                        onClick = onReplayIntro,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("replay_intro_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.AutoAwesome,
+                            contentDescription = null,
+                            tint = SaffronGold,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.size(6.dp))
+                        Text("Replay Colorful Intro", color = Color.White)
                     }
                 }
             }

@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "chapter_progress")
@@ -123,6 +125,17 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun studyProgressDao(): StudyProgressDao
 
     companion object {
+        val MIGRATION_1_2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `topic_verification` (`topicNumber` TEXT NOT NULL, `chapterNumber` INTEGER NOT NULL, `completionStatus` TEXT NOT NULL, `verifiedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`topicNumber`))"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `concept_stats` (`conceptTag` TEXT NOT NULL, `chapterNumber` INTEGER NOT NULL, `attempts` INTEGER NOT NULL, `errors` INTEGER NOT NULL, `confidenceRating` INTEGER NOT NULL, `lastMistakeSummary` TEXT NOT NULL, `updatedAtMillis` INTEGER NOT NULL, PRIMARY KEY(`conceptTag`))"
+                )
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -133,7 +146,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sslc_maths_ksmke.db"
                 )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .addMigrations(MIGRATION_1_2)
                     .build()
                     .also { INSTANCE = it }
             }

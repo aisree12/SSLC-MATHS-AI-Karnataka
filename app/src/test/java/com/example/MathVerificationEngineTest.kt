@@ -1,9 +1,11 @@
 package com.example
 
 import com.example.data.ksmke.AiTeachingLibrary
+import com.example.data.ksmke.AuditStepStatus
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.ksmke.OfficialSourceLibrary
 import com.example.data.ksmke.PyqAnalyticsEngine
+import com.example.data.ksmke.TextbookCoverageAuditEngine
 import com.example.data.local.ConceptStatEntity
 import com.example.data.remote.OpenWeightAiClient
 import com.example.domain.ExamMode
@@ -155,18 +157,52 @@ class MathVerificationEngineTest {
     }
 
     @Test
-    fun openWeightCatalogAndJsonParser_excludePaidEnginesAndSupportQwen() {
+    fun openWeightCatalogAndJsonParser_includeKeylessGeminiExcludePaidGptAndSupportOnDevice() {
         val models = OpenWeightModelCatalog.models
         assertTrue(models.any { it.id.contains("qwen", ignoreCase = true) })
         assertTrue(models.any { it.id.contains("deepseek", ignoreCase = true) })
         assertTrue(models.any { it.id.contains("llama", ignoreCase = true) })
         assertTrue(models.any { it.supportsVision })
-        assertFalse(models.any { it.id.contains("gemini", ignoreCase = true) || it.id.contains("gpt-", ignoreCase = true) })
-        assertFalse(OpenWeightProvider.LOCAL_OLLAMA.requiresApiKey)
+        assertFalse(models.any { it.id.contains("gpt-", ignoreCase = true) })
+
+        // Verify keyless Gemini models via Firebase AI Logic + App Check
+        assertFalse(OpenWeightProvider.GEMINI.requiresApiKey)
+        val geminiModels = OpenWeightModelCatalog.modelsFor(OpenWeightProvider.GEMINI)
+        assertTrue(geminiModels.any { it.id == "gemini-3.8-flash" && it.supportsVision })
+        assertTrue(geminiModels.any { it.id == "gemini-3.5-flash-lite" && it.supportsVision })
+        assertTrue(geminiModels.any { it.id == "gemini-4-argon" && it.supportsVision })
+
+        assertTrue(OpenWeightProvider.ON_DEVICE_OFFLINE.runsOnPhoneHardware)
+        assertFalse(OpenWeightProvider.ON_DEVICE_OFFLINE.requiresApiKey)
+        assertTrue(OpenWeightModelCatalog.onDeviceQuantizedModels.size >= 2)
+        assertTrue(OpenWeightModelCatalog.onDeviceQuantizedModels.all { it.fileName.endsWith(".task") })
+        assertFalse(OpenWeightProvider.SELF_HOSTED_OLLAMA.requiresApiKey)
+
+        // Verify textbook corpus audit & bundled 5 core theorem proofs
+        val audit = OfficialSourceLibrary.sixCriterionCorpusAudit
+        assertEquals(6, audit.size)
+        val ch2 = KsmkeSyllabusRepository.getChapter(2)
+        val ch4 = KsmkeSyllabusRepository.getChapter(4)
+        assertEquals(5, ch2.theorems.size + ch4.theorems.size)
 
         val jsonSlice = OpenWeightAiClient.extractJsonString(
             "<think>reasoning steps</think>\n```json\n{\"questions\": [{\"marks\": 2}]}\n```"
         )
         assertEquals("{\"questions\": [{\"marks\": 2}]}", jsonSlice)
+    }
+
+    @Test
+    fun textbookCoverageAudit_passesAll7StepsAcrossPages1To342AndVerifiesMath() {
+        val report = TextbookCoverageAuditEngine.runFullAudit()
+        assertEquals(342, report.totalPagesExpected)
+        assertEquals(342, report.pagesCoveredCount)
+        assertTrue(report.continuousPageCoveragePassed)
+        assertEquals(7, report.sevenSteps.size)
+        assertTrue(report.sevenSteps.all { it.status == AuditStepStatus.PASSED })
+        assertEquals(15, report.chapterReports.size)
+        assertTrue(report.chapterReports.all { it.status == AuditStepStatus.PASSED })
+        assertTrue(report.mathChecks.size >= 10)
+        assertTrue(report.mathChecks.all { it.passed })
+        assertTrue(report.allPassed)
     }
 }

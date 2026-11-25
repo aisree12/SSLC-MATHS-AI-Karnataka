@@ -8,11 +8,14 @@ import androidx.lifecycle.viewModelScope
 import com.example.core.PdfExportManager
 import com.example.core.PdfExportResult
 import com.example.data.ksmke.KsmkeSyllabusRepository
+import android.net.Uri
 import com.example.data.local.ChapterProgressEntity
 import com.example.data.local.ConceptStatEntity
 import com.example.data.local.DailyGoalEntity
 import com.example.data.local.ExamHistoryEntity
 import com.example.data.local.LocalProgressRepository
+import com.example.data.local.OnDeviceModelManager
+import com.example.data.local.OnDeviceModelStatus
 import com.example.data.remote.AiTeacherRepository
 import com.example.data.remote.ChapterMasteryDoc
 import com.example.data.remote.ExamAttemptDoc
@@ -29,6 +32,7 @@ import com.example.domain.MathEngineSolution
 import com.example.domain.MathVerificationEngine
 import com.example.domain.MasteryStatus
 import com.example.domain.OpenWeightModelCatalog
+import com.example.domain.OpenWeightModelSpec
 import com.example.domain.OpenWeightProvider
 import com.example.domain.PyqQuestion
 import com.example.domain.TargetedPaperQuestion
@@ -106,7 +110,8 @@ class SslcStudyViewModel(
     private val localProgress: LocalProgressRepository,
     private val aiTeacher: AiTeacherRepository,
     private val currentUserId: String,
-    private val initialDisplayName: String
+    private val initialDisplayName: String,
+    private val onDeviceModelManager: OnDeviceModelManager? = null
 ) : ViewModel() {
 
     private val _language = MutableStateFlow(TeachingLanguage.BILINGUAL)
@@ -123,6 +128,9 @@ class SslcStudyViewModel(
 
     private val _selectedModelId = MutableStateFlow(aiTeacher.activeModelId)
     val selectedModelId: StateFlow<String> = _selectedModelId.asStateFlow()
+
+    val onDeviceModelStatuses: StateFlow<Map<String, OnDeviceModelStatus>> =
+        onDeviceModelManager?.statuses ?: MutableStateFlow<Map<String, OnDeviceModelStatus>>(emptyMap()).asStateFlow()
 
     val isOpenAiKeyConfigured: Boolean
         get() = aiTeacher.isApiKeyConfigured()
@@ -321,6 +329,38 @@ class SslcStudyViewModel(
     fun selectOpenWeightModel(modelId: String) {
         _selectedModelId.value = modelId
         aiTeacher.activeModelId = modelId
+    }
+
+    fun selectAiModel(spec: OpenWeightModelSpec) {
+        _selectedProvider.value = spec.provider
+        _selectedModelId.value = spec.id
+        aiTeacher.activeProvider = spec.provider
+        aiTeacher.activeModelId = spec.id
+        _aiError.value = null
+    }
+
+    fun downloadOnDeviceModel(modelId: String) {
+        onDeviceModelManager?.startDownload(modelId)
+    }
+
+    fun cancelOnDeviceModelDownload(modelId: String) {
+        onDeviceModelManager?.cancelDownload(modelId)
+    }
+
+    fun deleteOnDeviceModel(modelId: String) {
+        onDeviceModelManager?.deleteModel(modelId)
+    }
+
+    fun importLocalOnDeviceModel(modelId: String, uri: Uri) {
+        val manager = onDeviceModelManager ?: return
+        viewModelScope.launch {
+            val res = manager.importLocalModelFile(modelId, uri)
+            res.onSuccess {
+                _syncMessage.value = "Quantised on-device model imported and ready for offline AI."
+            }.onFailure { err ->
+                _aiError.value = err.localizedMessage ?: "Failed to import .task model file."
+            }
+        }
     }
 
     fun dismissSyncMessage() {
@@ -1022,5 +1062,6 @@ class SslcStudyViewModel(
     override fun onCleared() {
         super.onCleared()
         examTimerJob?.cancel()
+        aiTeacher.releaseOnDeviceEngine()
     }
 }

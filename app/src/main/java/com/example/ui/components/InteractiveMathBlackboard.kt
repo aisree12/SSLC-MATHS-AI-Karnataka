@@ -67,6 +67,18 @@ fun InteractiveMathBlackboardCard(modifier: Modifier = Modifier) {
     // Circle external point distance OP (radius fixed at 3.0)
     var opDistance by rememberSaveable { mutableFloatStateOf(5.0f) }
 
+    // Constructions step slider (1..4)
+    var constructionStep by rememberSaveable { mutableIntStateOf(4) }
+
+    // Trig Elevation slider (base distance & angle)
+    var elevDistance by rememberSaveable { mutableFloatStateOf(30f) }
+    var elevAngleDeg by rememberSaveable { mutableIntStateOf(30) }
+
+    // Frustum slider (bottom radius r1, top radius r2, height h)
+    var frustumR1 by rememberSaveable { mutableFloatStateOf(4f) }
+    var frustumR2 by rememberSaveable { mutableFloatStateOf(2f) }
+    var frustumH by rememberSaveable { mutableFloatStateOf(6f) }
+
     Card(
         colors = CardDefaults.cardColors(containerColor = IndigoInkDeep),
         shape = RoundedCornerShape(20.dp),
@@ -84,7 +96,7 @@ fun InteractiveMathBlackboardCard(modifier: Modifier = Modifier) {
                 color = Color.White
             )
             Text(
-                text = "Drag the sliders to manipulate live SSLC coordinate graphs, parabolas, BPT ratios, and circle tangents.",
+                text = "Drag the sliders to manipulate live SSLC graphs, parabolas, BPT ratios, circle tangents, constructions, trig heights & frustum solids.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFCBD5E1)
             )
@@ -97,7 +109,10 @@ fun InteractiveMathBlackboardCard(modifier: Modifier = Modifier) {
                     "Linear Graph (4M)",
                     "Quadratic Parabola",
                     "Thales BPT",
-                    "Circle Tangents"
+                    "Circle Tangents",
+                    "Constructions (3M)",
+                    "Trig Elevation",
+                    "Frustum Solid"
                 ).forEachIndexed { idx, label ->
                     FilterChip(
                         selected = mode == idx,
@@ -204,7 +219,7 @@ fun InteractiveMathBlackboardCard(modifier: Modifier = Modifier) {
                     ChalkboardSlider("Slide Parallel Line DE", bptFrac, 0.2f..0.8f) { bptFrac = it }
                 }
 
-                else -> {
+                3 -> {
                     val r = 3.0f
                     val tangentLen = sqrt((opDistance * opDistance - r * r).coerceAtLeast(0f))
                     CircleTangentCanvas(opRatio = opDistance / r)
@@ -232,6 +247,108 @@ fun InteractiveMathBlackboardCard(modifier: Modifier = Modifier) {
                     ChalkboardSlider("Distance OP from Centre (cm)", opDistance, 3.5f..8.0f) {
                         opDistance = snapHalf(it)
                     }
+                }
+
+                4 -> {
+                    LineDivisionConstructionCanvas(step = constructionStep)
+                    val stepDescription = when (constructionStep) {
+                        1 -> "Step 1: Draw segment AB and acute ray AX below AB."
+                        2 -> "Step 2: Mark m + n = 3 + 2 = 5 equal compass arcs A₁..A₅ along ray AX."
+                        3 -> "Step 3: Join the 5th arc A₅ to endpoint B."
+                        else -> "Step 4: From A₃ draw A₃P || A₅B using equal corresponding arcs ⇒ AP : PB = 3 : 2."
+                    }
+                    Surface(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Ch 6 Line Segment Division (Ratio 3 : 2) • Compass Arcs Shown",
+                                style = MathMonoTextStyle,
+                                color = Color.White
+                            )
+                            Text(
+                                text = stepDescription,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SaffronGold
+                            )
+                        }
+                    }
+                    ChalkboardSlider("Construction Step (1 to 4)", constructionStep.toFloat(), 1f..4f) {
+                        constructionStep = it.roundToInt().coerceIn(1, 4)
+                    }
+                }
+
+                5 -> {
+                    val trigSol = MathVerificationEngine.solveElevationHeight(elevDistance.toDouble(), elevAngleDeg)
+                    TrigElevationCanvas(angleDeg = elevAngleDeg)
+                    Surface(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Base BC = ${fmt1(elevDistance)} m  •  Elevation θ = $elevAngleDeg°  •  tan($elevAngleDeg°) = h / BC",
+                                style = MathMonoTextStyle,
+                                color = Color.White
+                            )
+                            Text(
+                                text = "${trigSol.summary} m (Right Triangle Line-of-Sight Diagram)",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SaffronGold
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(30, 45, 60).forEach { ang ->
+                            FilterChip(
+                                selected = elevAngleDeg == ang,
+                                onClick = { elevAngleDeg = ang },
+                                label = { Text("${ang}°") }
+                            )
+                        }
+                    }
+                    ChalkboardSlider("Horizontal Distance BC (m)", elevDistance, 10f..60f) {
+                        elevDistance = (it / 5f).roundToInt() * 5f
+                    }
+                }
+
+                else -> {
+                    val safeR1 = maxOf(frustumR1, frustumR2 + 0.5f)
+                    val fruSol = MathVerificationEngine.solveMensurationFrustum(safeR1.toDouble(), frustumR2.toDouble(), frustumH.toDouble())
+                    FrustumSolidCanvas(r1 = safeR1, r2 = frustumR2, h = frustumH)
+                    Surface(
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "r₁ = ${fmt1(safeR1)} cm, r₂ = ${fmt1(frustumR2)} cm, h = ${fmt1(frustumH)} cm",
+                                style = MathMonoTextStyle,
+                                color = Color.White
+                            )
+                            Text(
+                                text = fruSol.summary,
+                                style = MaterialTheme.typography.labelLarge,
+                                color = SaffronGold
+                            )
+                        }
+                    }
+                    ChalkboardSlider("Bottom Radius r₁ (cm)", frustumR1, 3f..7f) { frustumR1 = snapHalf(it) }
+                    ChalkboardSlider("Top Radius r₂ (cm)", frustumR2, 1f..2.5f) { frustumR2 = snapHalf(it) }
+                    ChalkboardSlider("Height h (cm)", frustumH, 3f..12f) { frustumH = snapHalf(it) }
                 }
             }
         }
@@ -448,6 +565,133 @@ private fun CircleTangentCanvas(opRatio: Float) {
         drawCircle(SaffronGold, radius = 8f, center = Offset(px, py))
         drawCircle(EmeraldChalk, radius = 8f, center = Offset(qx, qy))
         drawCircle(EmeraldChalk, radius = 8f, center = Offset(rx, ry))
+    }
+}
+
+@Composable
+private fun LineDivisionConstructionCanvas(step: Int) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .background(Color(0xFF0B1528), RoundedCornerShape(14.dp))
+    ) {
+        val ax = size.width * 0.14f
+        val ay = size.height * 0.25f
+        val bx = size.width * 0.86f
+        val by = ay
+
+        // Step 1: Segment AB and acute ray AX
+        drawLine(Color(0xFF38BDF8), Offset(ax, ay), Offset(bx, by), strokeWidth = 6f, cap = StrokeCap.Round)
+        drawCircle(Color.White, radius = 7f, center = Offset(ax, ay))
+        drawCircle(Color.White, radius = 7f, center = Offset(bx, by))
+
+        val rayEndX = size.width * 0.72f
+        val rayEndY = size.height * 0.88f
+        drawLine(Color(0xFF94A3B8), Offset(ax, ay), Offset(rayEndX, rayEndY), strokeWidth = 3f)
+
+        // Step 2: 5 equal arcs A1..A5 along ray AX
+        if (step >= 2) {
+            for (i in 1..5) {
+                val t = i / 5.5f
+                val px = ax + (rayEndX - ax) * t
+                val py = ay + (rayEndY - ay) * t
+                drawCircle(
+                    color = if (i == 3 || i == 5) SaffronGold else Color(0xFF64748B),
+                    radius = if (i == 3 || i == 5) 7f else 5f,
+                    center = Offset(px, py)
+                )
+            }
+        }
+
+        // Step 3: Join A5 to B
+        val t5 = 5 / 5.5f
+        val a5x = ax + (rayEndX - ax) * t5
+        val a5y = ay + (rayEndY - ay) * t5
+        if (step >= 3) {
+            drawLine(EmeraldChalk, Offset(a5x, a5y), Offset(bx, by), strokeWidth = 4f)
+        }
+
+        // Step 4: Draw A3P || A5B dividing AB in 3:2
+        if (step >= 4) {
+            val t3 = 3 / 5.5f
+            val a3x = ax + (rayEndX - ax) * t3
+            val a3y = ay + (rayEndY - ay) * t3
+            val px = ax + (bx - ax) * (3f / 5f)
+            val py = ay
+            drawLine(SaffronGold, Offset(a3x, a3y), Offset(px, py), strokeWidth = 5f, cap = StrokeCap.Round)
+            drawCircle(SaffronGold, radius = 9f, center = Offset(px, py))
+        }
+    }
+}
+
+@Composable
+private fun TrigElevationCanvas(angleDeg: Int) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .background(Color(0xFF0B1528), RoundedCornerShape(14.dp))
+    ) {
+        val bx = size.width * 0.78f
+        val by = size.height * 0.84f
+        val cx = size.width * 0.18f
+        val cy = by
+        val tanFactor = when (angleDeg) {
+            60 -> 0.72f
+            45 -> 0.56f
+            else -> 0.36f
+        }
+        val ay = (by - size.height * tanFactor).coerceAtLeast(size.height * 0.12f)
+
+        // Tower AB, Base BC, Line of sight AC
+        drawLine(EmeraldChalk, Offset(bx, by), Offset(bx, ay), strokeWidth = 6f, cap = StrokeCap.Round)
+        drawLine(Color(0xFF38BDF8), Offset(cx, cy), Offset(bx, by), strokeWidth = 5f, cap = StrokeCap.Round)
+        drawLine(SaffronGold, Offset(cx, cy), Offset(bx, ay), strokeWidth = 5f, cap = StrokeCap.Round)
+
+        // Right angle box at B
+        val box = 16f
+        drawLine(Color.White, Offset(bx - box, by), Offset(bx - box, by - box), strokeWidth = 2f)
+        drawLine(Color.White, Offset(bx - box, by - box), Offset(bx, by - box), strokeWidth = 2f)
+
+        drawCircle(SaffronGold, radius = 8f, center = Offset(bx, ay))
+        drawCircle(Color.White, radius = 7f, center = Offset(bx, by))
+        drawCircle(Color(0xFF38BDF8), radius = 8f, center = Offset(cx, cy))
+    }
+}
+
+@Composable
+private fun FrustumSolidCanvas(r1: Float, r2: Float, h: Float) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(210.dp)
+            .background(Color(0xFF0B1528), RoundedCornerShape(14.dp))
+    ) {
+        val cx = size.width * 0.5f
+        val bottomY = size.height * 0.80f
+        val topY = (bottomY - (h / 12f) * size.height * 0.56f).coerceAtLeast(size.height * 0.16f)
+        val rx1 = (r1 / 7f) * size.width * 0.34f
+        val rx2 = (r2 / 7f) * size.width * 0.34f
+
+        // Slant sides
+        drawLine(Color(0xFF38BDF8), Offset(cx - rx1, bottomY), Offset(cx - rx2, topY), strokeWidth = 5f)
+        drawLine(Color(0xFF38BDF8), Offset(cx + rx1, bottomY), Offset(cx + rx2, topY), strokeWidth = 5f)
+        // Height axis
+        drawLine(SaffronGold, Offset(cx, topY), Offset(cx, bottomY), strokeWidth = 3f)
+        // Top & bottom rims
+        drawOval(
+            color = EmeraldChalk,
+            topLeft = Offset(cx - rx2, topY - 14f),
+            size = androidx.compose.ui.geometry.Size(rx2 * 2f, 28f),
+            style = Stroke(width = 4f)
+        )
+        drawOval(
+            color = Color(0xFF38BDF8),
+            topLeft = Offset(cx - rx1, bottomY - 18f),
+            size = androidx.compose.ui.geometry.Size(rx1 * 2f, 36f),
+            style = Stroke(width = 4f)
+        )
     }
 }
 

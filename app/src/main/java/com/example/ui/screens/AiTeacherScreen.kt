@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -26,27 +27,38 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -60,11 +72,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.VoiceTeacherHelper
 import com.example.data.ksmke.KsmkeSyllabusRepository
+import com.example.data.local.OnDeviceModelStatus
 import com.example.domain.ChatTurn
 import com.example.domain.OpenWeightModelCatalog
 import com.example.domain.OpenWeightProvider
@@ -89,14 +104,30 @@ fun AiTeacherScreen(
     val cameraScanState by viewModel.cameraScanState.collectAsStateWithLifecycle()
     val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
     val selectedModelId by viewModel.selectedModelId.collectAsStateWithLifecycle()
+    val onDeviceStatuses by viewModel.onDeviceModelStatuses.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     var input by rememberSaveable { mutableStateOf("") }
     var showScannerSheet by remember { mutableStateOf(false) }
+    var showModelMenu by remember { mutableStateOf(false) }
     var isListening by remember { mutableStateOf(false) }
     var isSpeaking by remember { mutableStateOf(false) }
     var voiceStatus by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
+
+    val activeModelSpec = remember(selectedProvider, selectedModelId) {
+        OpenWeightModelCatalog.models.firstOrNull {
+            it.provider == selectedProvider && it.id == selectedModelId
+        } ?: OpenWeightModelCatalog.defaultTextModel(selectedProvider)
+    }
+
+    val importTaskLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.importLocalOnDeviceModel(selectedModelId, uri)
+        }
+    }
 
     val voiceHelper = remember(context) {
         VoiceTeacherHelper(
@@ -178,7 +209,11 @@ fun AiTeacherScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                    ) {
                         Text(
                             text = "Guruji • SSLC AI Teacher",
                             style = MaterialTheme.typography.titleMedium
@@ -187,29 +222,129 @@ fun AiTeacherScreen(
                             text = selectedChapter?.let { "Ch ${it.chapterNumber}: ${it.titleEn} (${it.titleKn})" }
                                 ?: "All 15 Karnataka SSLC Chapters",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (offlineMode) "Active: Rule-Based KSMKE Guide (No LLM)" else "Active: ${activeModelSpec.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EmeraldChalk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Filled.CloudOff,
-                            contentDescription = "Offline Study Mode",
-                            tint = if (offlineMode) SaffronGold else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.size(4.dp))
-                        Switch(
-                            checked = offlineMode,
-                            onCheckedChange = { viewModel.setOfflineStudyMode(it) },
-                            modifier = Modifier.testTag("offline_mode_switch")
-                        )
+
+                    // Single Top-Right Corner Dropdown Button: "AI Model"
+                    Box {
+                        OutlinedButton(
+                            onClick = { showModelMenu = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.testTag("ai_model_dropdown_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Psychology,
+                                contentDescription = null,
+                                tint = IndigoInk,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text(
+                                text = "AI Model",
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Choose AI Model",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = showModelMenu,
+                            onDismissRequest = { showModelMenu = false },
+                            modifier = Modifier
+                                .widthIn(min = 270.dp, max = 330.dp)
+                                .heightIn(max = 420.dp)
+                        ) {
+                            OpenWeightProvider.entries.forEachIndexed { idx, provider ->
+                                if (idx > 0) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                }
+                                Text(
+                                    text = "${provider.displayName} • ${provider.badge}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = IndigoInk,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                )
+                                OpenWeightModelCatalog.modelsFor(provider).forEach { model ->
+                                    val isSelected = selectedProvider == provider && selectedModelId == model.id
+                                    val onDeviceReady = if (provider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+                                        onDeviceStatuses[model.id] is OnDeviceModelStatus.Ready
+                                    } else false
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = model.label,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                )
+                                                val sub = buildString {
+                                                    append(model.family)
+                                                    if (model.supportsVision) append(" • Camera Vision")
+                                                    if (provider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+                                                        append(if (onDeviceReady) " • Downloaded Offline" else " • Download Required")
+                                                    }
+                                                }
+                                                Text(
+                                                    text = sub,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = if (onDeviceReady) EmeraldChalk else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        trailingIcon = {
+                                            if (isSelected) {
+                                                Icon(
+                                                    imageVector = Icons.Filled.Check,
+                                                    contentDescription = "Selected model",
+                                                    tint = EmeraldChalk
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.selectAiModel(model)
+                                            showModelMenu = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 
                 Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.horizontalScroll(rememberScrollState())
                 ) {
+                    FilterChip(
+                        selected = offlineMode,
+                        onClick = { viewModel.setOfflineStudyMode(!offlineMode) },
+                        label = { Text(if (offlineMode) "Rule Guide: ON" else "Rule Guide: OFF") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Filled.CloudOff,
+                                contentDescription = "Rule-Based Offline Guide",
+                                tint = if (offlineMode) SaffronGold else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        modifier = Modifier.testTag("offline_mode_switch")
+                    )
                     TeachingLanguage.entries.forEach { lang ->
                         FilterChip(
                             selected = language == lang,
@@ -240,37 +375,40 @@ fun AiTeacherScreen(
                     }
                 }
 
-                // Free Open-Weight OpenAI-Compatible Provider & Model Picker (Qwen, DeepSeek, Llama, Mistral, Ollama)
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                ) {
-                    OpenWeightProvider.entries.forEach { provider ->
-                        FilterChip(
-                            selected = selectedProvider == provider,
-                            onClick = { viewModel.selectOpenWeightProvider(provider) },
-                            label = { Text(provider.displayName) }
+                // Contextual status strip for On-Device AI weights, Ollama host, or missing API key
+                when {
+                    selectedProvider == OpenWeightProvider.GEMINI -> {
+                        Text(
+                            text = "Keyless Google Gemini powered by Firebase AI Logic + App Check (No API key needed). Supports Text + Camera Vision.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EmeraldChalk
                         )
                     }
-                }
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                ) {
-                    OpenWeightModelCatalog.modelsFor(selectedProvider).forEach { model ->
-                        FilterChip(
-                            selected = selectedModelId == model.id,
-                            onClick = { viewModel.selectOpenWeightModel(model.id) },
-                            label = { Text(model.label) }
+                    selectedProvider == OpenWeightProvider.ON_DEVICE_OFFLINE -> {
+                        val onDeviceStatus = onDeviceStatuses[selectedModelId]
+                            ?: OnDeviceModelStatus.NotDownloaded(OpenWeightModelCatalog.findOnDeviceSpec(selectedModelId))
+                        OnDeviceModelStatusStrip(
+                            status = onDeviceStatus,
+                            onDownload = { viewModel.downloadOnDeviceModel(selectedModelId) },
+                            onCancel = { viewModel.cancelOnDeviceModelDownload(selectedModelId) },
+                            onDelete = { viewModel.deleteOnDeviceModel(selectedModelId) },
+                            onImportLocal = { importTaskLauncher.launch(arrayOf("*/*")) }
                         )
                     }
-                }
-                if (selectedProvider.requiresApiKey && !viewModel.isOpenAiKeyConfigured) {
-                    Text(
-                        text = "Tip: Add a free ${selectedProvider.displayName} key to OPENAI_COMPAT_API_KEY in AI Studio Secrets, or switch to Local Ollama / Offline Mode.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SaffronGold
-                    )
+                    selectedProvider == OpenWeightProvider.SELF_HOSTED_OLLAMA -> {
+                        Text(
+                            text = "Note: Ollama connects to a host LAN/emulator server (10.0.2.2:11434). For phone-only offline AI without a computer, choose On-Device AI in the AI Model menu.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    selectedProvider.requiresApiKey && !viewModel.isOpenAiKeyConfigured -> {
+                        Text(
+                            text = "Tip: Add a free ${selectedProvider.displayName} key to OPENAI_COMPAT_API_KEY in Secrets, or pick Gemini (Firebase AI) or On-Device AI from AI Model.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SaffronGold
+                        )
+                    }
                 }
             }
         }
@@ -577,3 +715,145 @@ private fun ChatBubble(
         }
     }
 }
+
+@Composable
+private fun OnDeviceModelStatusStrip(
+    status: OnDeviceModelStatus,
+    onDownload: () -> Unit,
+    onCancel: () -> Unit,
+    onDelete: () -> Unit,
+    onImportLocal: () -> Unit
+) {
+    Surface(
+        color = IndigoInk.copy(alpha = 0.06f),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("on_device_model_strip")
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(10.dp)
+        ) {
+            when (status) {
+                is OnDeviceModelStatus.NotDownloaded -> {
+                    Text(
+                        text = "${status.spec.displayName} (${status.spec.approxSizeLabel}) • Min ${status.spec.minRamGb} GB RAM",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = IndigoInk
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedButton(
+                            onClick = onDownload,
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("download_on_device_model_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Download,
+                                contentDescription = "Download quantised model",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text("Download Weights")
+                        }
+                        TextButton(
+                            onClick = onImportLocal,
+                            modifier = Modifier.testTag("import_on_device_model_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.FileOpen,
+                                contentDescription = "Import local .task model",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.size(4.dp))
+                            Text("Import .task")
+                        }
+                    }
+                }
+
+                is OnDeviceModelStatus.Downloading -> {
+                    val mbDone = (status.downloadedBytes / (1024L * 1024L))
+                    val mbTotal = (status.totalBytes / (1024L * 1024L)).coerceAtLeast(1L)
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Downloading ${status.spec.displayName}: ${status.percent}% ($mbDone / $mbTotal MB)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IndigoInk,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(onClick = onCancel) {
+                            Text("Cancel", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    LinearProgressIndicator(
+                        progress = { status.progressFraction },
+                        color = EmeraldChalk,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                is OnDeviceModelStatus.Ready -> {
+                    val mb = (status.sizeBytes / (1024L * 1024L))
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.CheckCircle,
+                                contentDescription = "Offline model ready",
+                                tint = EmeraldChalk,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = "Ready Offline on Phone • ${status.spec.displayName} ($mb MB)",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = EmeraldChalk
+                            )
+                        }
+                        IconButton(
+                            onClick = onDelete,
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.DeleteOutline,
+                                contentDescription = "Remove downloaded model",
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                is OnDeviceModelStatus.Error -> {
+                    Text(
+                        text = status.message,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onDownload) {
+                            Text("Retry Download")
+                        }
+                        TextButton(onClick = onImportLocal) {
+                            Text("Import .task")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

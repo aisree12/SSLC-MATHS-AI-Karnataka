@@ -18,6 +18,14 @@ data class AnswerVerificationResult(
     val feedback: String
 )
 
+data class MathAuditCheckResult(
+    val chapterNumber: Int,
+    val problemTitle: String,
+    val expectedSummary: String,
+    val computedAnswer: String,
+    val passed: Boolean
+)
+
 /**
  * Independent deterministic Mathematics Engine for Karnataka SSLC Class 10.
  * Never delegates arithmetic or algebraic roots to an LLM.
@@ -188,6 +196,178 @@ object MathVerificationEngine {
             finalAnswer = "d = ${fmt(dist)}, M = (${fmt(midX)}, ${fmt(midY)})",
             numericResults = listOf(dist, midX, midY, px, py)
         )
+    }
+
+    fun solveCircleTangentLength(centerDistance: Double, radius: Double): MathEngineSolution {
+        val diff = centerDistance * centerDistance - radius * radius
+        if (diff <= 0.0) {
+            return MathEngineSolution(
+                topic = "Circle Tangent Verification",
+                summary = "Invalid geometry: point must lie strictly outside circle (d > r).",
+                steps = listOf("Given OQ = ${fmt(centerDistance)}, r = ${fmt(radius)} ⇒ OQ ≤ r."),
+                finalAnswer = "No tangent exists"
+            )
+        }
+        val tangentLen = sqrt(diff)
+        val steps = listOf(
+            "1. By Theorem 4.1, radius OP ⊥ tangent PQ ⇒ ∠OPQ = 90°",
+            "2. OQ² = OP² + PQ² ⇒ PQ = √(${fmt(centerDistance)}² - ${fmt(radius)}²)",
+            "3. PQ = √${fmt(diff)} = ${fmt(tangentLen)}"
+        )
+        return MathEngineSolution(
+            topic = "Circle Tangent Verification",
+            summary = "PQ = ${fmt(tangentLen)}",
+            steps = steps,
+            finalAnswer = "PQ = ${fmt(tangentLen)}",
+            numericResults = listOf(tangentLen)
+        )
+    }
+
+    fun solveSectorAndSegment(
+        radius: Double,
+        angleDeg: Double,
+        piValue: Double = 22.0 / 7.0
+    ): MathEngineSolution {
+        val arcLen = (angleDeg / 360.0) * 2.0 * piValue * radius
+        val sectorArea = (angleDeg / 360.0) * piValue * radius * radius
+        val triArea = 0.5 * radius * radius * kotlin.math.sin(Math.toRadians(angleDeg))
+        val segmentArea = sectorArea - triArea
+        val steps = listOf(
+            "1. Given r = ${fmt(radius)}, θ = ${fmt(angleDeg)}°, π = ${fmt(piValue)}",
+            "2. Arc Length l = (θ/360) × 2πr = ${fmt(arcLen)}",
+            "3. Sector Area = (θ/360) × πr² = ${fmt(sectorArea)}",
+            "4. Minor Segment = Sector - ½r²sinθ = ${fmt(sectorArea)} - ${fmt(triArea)} = ${fmt(segmentArea)}"
+        )
+        return MathEngineSolution(
+            topic = "Sector & Segment Verification",
+            summary = "Sector = ${fmt(sectorArea)}, Minor Segment = ${fmt(segmentArea)}",
+            steps = steps,
+            finalAnswer = "Sector = ${fmt(sectorArea)}, Segment = ${fmt(segmentArea)}",
+            numericResults = listOf(arcLen, sectorArea, segmentArea)
+        )
+    }
+
+    fun solveEuclidHcfLcm(a: Int, b: Int): MathEngineSolution {
+        var x = abs(a)
+        var y = abs(b)
+        val steps = mutableListOf<String>()
+        while (y != 0) {
+            val q = x / y
+            val r = x % y
+            steps.add("$x = $y × $q + $r")
+            x = y
+            y = r
+        }
+        val hcf = x.coerceAtLeast(1)
+        val lcm = (abs(a.toLong() * b.toLong()) / hcf).toDouble()
+        steps.add("HCF($a, $b) = $hcf; LCM($a, $b) = ($a × $b)/$hcf = ${fmt(lcm)}")
+        return MathEngineSolution(
+            topic = "Euclid's Lemma HCF & LCM",
+            summary = "HCF = $hcf, LCM = ${fmt(lcm)}",
+            steps = steps,
+            finalAnswer = "HCF = $hcf, LCM = ${fmt(lcm)}",
+            numericResults = listOf(hcf.toDouble(), lcm)
+        )
+    }
+
+    fun solveElevationHeight(horizontalDistance: Double, angleDeg: Int): MathEngineSolution {
+        val tanTheta = kotlin.math.tan(Math.toRadians(angleDeg.toDouble()))
+        val height = horizontalDistance * tanTheta
+        val steps = listOf(
+            "1. Base distance BC = ${fmt(horizontalDistance)}, Angle of elevation θ = $angleDeg°",
+            "2. tan($angleDeg°) = Height / Base ⇒ h = ${fmt(horizontalDistance)} × ${fmt(tanTheta)} = ${fmt(height)}"
+        )
+        return MathEngineSolution(
+            topic = "Heights & Distances",
+            summary = "Height = ${fmt(height)}",
+            steps = steps,
+            finalAnswer = "h = ${fmt(height)}",
+            numericResults = listOf(height)
+        )
+    }
+
+    fun solveGroupedDirectMean(classMarks: List<Double>, frequencies: List<Double>): MathEngineSolution {
+        val sumF = frequencies.sum().coerceAtLeast(1e-9)
+        val sumFx = classMarks.zip(frequencies).sumOf { (x, f) -> x * f }
+        val mean = sumFx / sumF
+        return MathEngineSolution(
+            topic = "Statistics Direct Mean",
+            summary = "Σfᵢxᵢ = ${fmt(sumFx)}, Σfᵢ = ${fmt(sumF)}, Mean = ${fmt(mean)}",
+            steps = listOf(
+                "1. Σfᵢ = ${fmt(sumF)}, Σfᵢxᵢ = ${fmt(sumFx)}",
+                "2. Mean x̄ = Σfᵢxᵢ / Σfᵢ = ${fmt(mean)}"
+            ),
+            finalAnswer = "x̄ = ${fmt(mean)}",
+            numericResults = listOf(mean, sumFx, sumF)
+        )
+    }
+
+    fun solveMensurationFrustum(
+        r1: Double,
+        r2: Double,
+        height: Double,
+        piValue: Double = 22.0 / 7.0
+    ): MathEngineSolution {
+        val slant = sqrt(height * height + (r1 - r2) * (r1 - r2))
+        val csa = piValue * (r1 + r2) * slant
+        val vol = (1.0 / 3.0) * piValue * height * (r1 * r1 + r2 * r2 + r1 * r2)
+        return MathEngineSolution(
+            topic = "Frustum of a Cone",
+            summary = "l = ${fmt(slant)}, CSA = ${fmt(csa)}, V = ${fmt(vol)}",
+            steps = listOf(
+                "1. l = √[h² + (r₁ - r₂)²] = ${fmt(slant)}",
+                "2. CSA = π(r₁ + r₂)l = ${fmt(csa)}",
+                "3. Volume = (1/3)πh(r₁² + r₂² + r₁r₂) = ${fmt(vol)}"
+            ),
+            finalAnswer = "V = ${fmt(vol)} cm³",
+            numericResults = listOf(vol, csa, slant)
+        )
+    }
+
+    fun verifyAllBundledTextbookExamples(): List<MathAuditCheckResult> {
+        val checks = mutableListOf<MathAuditCheckResult>()
+
+        val ch1 = solveArithmeticProgression(3.0, 5.0, 20)
+        checks += MathAuditCheckResult(1, "Ch 1: 20th term & sum of AP 3, 8, 13...", "a20=98, S20=1010", ch1.finalAnswer,
+            abs(ch1.numericResults[0] - 98.0) < 1e-4 && abs(ch1.numericResults[1] - 1010.0) < 1e-4)
+
+        val ch3 = solveLinearPair(1.0, 1.0, -14.0, 1.0, -1.0, -4.0)
+        checks += MathAuditCheckResult(3, "Ch 3: Linear pair x+y=14, x-y=4", "(9, 5)", ch3.finalAnswer,
+            abs(ch3.numericResults[0] - 9.0) < 1e-4 && abs(ch3.numericResults[1] - 5.0) < 1e-4)
+
+        val ch4 = solveCircleTangentLength(25.0, 7.0)
+        checks += MathAuditCheckResult(4, "Ch 4: Tangent length (OQ=25, r=7)", "24", ch4.finalAnswer,
+            abs(ch4.numericResults[0] - 24.0) < 1e-4)
+
+        val ch5 = solveSectorAndSegment(10.0, 90.0, 3.14)
+        checks += MathAuditCheckResult(5, "Ch 5: Sector & minor segment (r=10, 90°)", "78.5 / 28.5", ch5.finalAnswer,
+            abs(ch5.numericResults[1] - 78.5) < 0.05 && abs(ch5.numericResults[2] - 28.5) < 0.05)
+
+        val ch7 = solveCoordinateGeometry(-1.0, 7.0, 4.0, -3.0, 2.0, 3.0)
+        checks += MathAuditCheckResult(7, "Ch 7: Section formula (2:3) on (-1,7) & (4,-3)", "P(1, 3)", "(${fmt(ch7.numericResults[3])}, ${fmt(ch7.numericResults[4])})",
+            abs(ch7.numericResults[3] - 1.0) < 1e-4 && abs(ch7.numericResults[4] - 3.0) < 1e-4)
+
+        val ch8 = solveEuclidHcfLcm(96, 404)
+        checks += MathAuditCheckResult(8, "Ch 8: Euclid HCF & LCM of 96 and 404", "HCF=4, LCM=9696", ch8.finalAnswer,
+            abs(ch8.numericResults[0] - 4.0) < 1e-4 && abs(ch8.numericResults[1] - 9696.0) < 1e-4)
+
+        val ch10 = solveQuadratic(2.0, -7.0, 3.0)
+        checks += MathAuditCheckResult(10, "Ch 10: Roots of 2x² - 7x + 3 = 0", "3, 0.5", ch10.finalAnswer,
+            abs(ch10.numericResults[0] - 3.0) < 1e-4 && abs(ch10.numericResults[1] - 0.5) < 1e-4)
+
+        val ch12 = solveElevationHeight(30.0, 30)
+        checks += MathAuditCheckResult(12, "Ch 12: Tower height (30m base, 30°)", "10√3 ≈ 17.32", ch12.finalAnswer,
+            abs(ch12.numericResults[0] - 10.0 * sqrt(3.0)) < 0.05)
+
+        val ch13 = solveGroupedDirectMean(listOf(5.0, 15.0, 25.0, 35.0, 45.0), listOf(3.0, 5.0, 9.0, 5.0, 3.0))
+        checks += MathAuditCheckResult(13, "Ch 13: Direct Mean of grouped table", "25", ch13.finalAnswer,
+            abs(ch13.numericResults[0] - 25.0) < 1e-4)
+
+        val ch15 = solveMensurationFrustum(2.0, 1.0, 14.0)
+        checks += MathAuditCheckResult(15, "Ch 15: Frustum drinking glass capacity (r1=2, r2=1, h=14)", "102.67", ch15.finalAnswer,
+            abs(ch15.numericResults[0] - (308.0 / 3.0)) < 0.05)
+
+        return checks
     }
 
     fun verifyNumericAnswer(
