@@ -506,4 +506,12 @@ object KsmkeSupplementLibrary {
             gapResolutionSummary = "Added Ex 15.1–15.4 (31 questions), recasting solution, Frustum MathVerificationEngine check, and Frustum Canvas."
         )
     ).associateBy { it.chapterNumber }
+
+    /** Same curated supplement records exposed under official chapter IDs. */
+    val byOfficialChapter: Map<Int, ChapterTextbookSupplement> =
+        byChapter.values.mapNotNull { supplement ->
+            val officialId = OfficialSyllabus2026_27.officialIdForLegacy(supplement.chapterNumber)
+                ?: return@mapNotNull null
+            officialId to supplement.copy(chapterNumber = officialId)
+        }.toMap()
 }

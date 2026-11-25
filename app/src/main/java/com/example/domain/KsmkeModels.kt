@@ -242,7 +242,7 @@ data class StudyPlanSlot(
 enum class SyllabusCertificationState(val label: String) {
     FRAMEWORK_INDEXED("Framework Indexed (Partial Corpus)"),
     PARTIAL_CURATED("Curated Notes + Proofs (Exercises Pending)"),
-    CERTIFIED_COMPLETE("Certified & Audit Passed (All 15 Chapters, pp. 1–342)")
+    CERTIFIED_COMPLETE("Reserved: independent source audit not completed")
 }
 
 enum class CorpusCriterionStatus(val label: String) {
