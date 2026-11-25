@@ -420,7 +420,7 @@ class SslcStudyViewModel(
 
         viewModelScope.launch {
             try {
-                aiTeacher.streamTutorReply(
+                aiTeacher.streamTutorReplyWithFallback(
                     studentMessage = trimmed,
                     chapterNumber = _activeChapter.value,
                     language = _language.value,
