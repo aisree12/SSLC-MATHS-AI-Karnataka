@@ -24,9 +24,9 @@ object OfficialSourceLibrary {
             title = "KTBS Class 10 Mathematics Part 1 (English Medium)",
             languageMedium = "English",
             editionOrYear = "KSEAB / KTBS Revised 2026-27",
-            chaptersCovered = "Official 2026–27 Part 1: Real Numbers, Polynomials, Pair of Linear Equations, Quadratic Equations, Arithmetic Progressions, Triangles, Coordinate Geometry. Legacy mappings still need reconciliation.",
+            chaptersCovered = "Official 2026–27 chapters 1–7: Real Numbers (pp. 1–9), Polynomials (10–23), Pair of Linear Equations in Two Variables (24–37), Quadratic Equations (38–47), Arithmetic Progressions (48–71), Triangles (72–96), Coordinate Geometry (98–111). English section headings and exercise IDs are indexed.",
             provenanceAndPermissionNote = "Reference index only (copyrighted full KTBS PDF pages are NOT bundled verbatim; app holds curated topic notes & proofs).",
-            verificationState = "Index + Curated Notes (Full Verbatim Corpus Pending)"
+            verificationState = "Chapter/Section Index + Exercise IDs (Full Source Audit Pending)"
         ),
         OfficialSourceRecord(
             id = "ktbs_math_part2_en",
@@ -44,9 +44,9 @@ object OfficialSourceLibrary {
             title = "KTBS 10ನೇ ತರಗತಿ ಗಣಿತ ಭಾಗ 1 & 2 (ಕನ್ನಡ ಮಾಧ್ಯಮ)",
             languageMedium = "Kannada (ಕನ್ನಡ)",
             editionOrYear = "KSEAB / KTBS Revised 2026-27",
-            chaptersCovered = "Kannada chapter-title and page parity is pending direct contents-page verification; official structure has 14 chapters.",
-            provenanceAndPermissionNote = "Bilingual chapter/topic titles, theorem names, and 61+ PYQ prompts bundled; full Kannada exercise-by-exercise parity awaits KTBS corpus ingestion.",
-            verificationState = "Titles & PYQ Prompts Synced (Full KN Prose Partial)"
+            chaptersCovered = "All 14 Kannada chapter titles and printed page ranges are verified from the two Kannada contents pages; section-title and exercise-by-exercise parity remain pending.",
+            provenanceAndPermissionNote = "Kannada chapter titles and printed page ranges are indexed; exact Kannada section names, exercise numbering, examples, diagrams and full prose parity remain to be compared.",
+            verificationState = "Kannada Chapter Titles + Page Ranges Verified (Section/Exercise Parity Pending)"
         ),
         OfficialSourceRecord(
             id = "kseab_pyq_archive_2015_2026",
@@ -55,7 +55,7 @@ object OfficialSourceLibrary {
             languageMedium = "English & Kannada",
             editionOrYear = "2015 – 2026 Main, Supplementary & Preparatory (Curated Subset)",
             chaptersCovered = "Legacy tagged questions are remapped to official chapter IDs; legacy Constructions-only prompts are retained in a separate archive.",
-            provenanceAndPermissionNote = "Public examination questions (61+ items across 2015–2026) and official marking-step rubrics used for recurrence statistics.",
+            provenanceAndPermissionNote = "Curated question references and marking-step data are used for recurrence statistics; permission to redistribute source paper text is not established.",
             verificationState = "Curated remapped item bank (not a full decade archive)"
         ),
         OfficialSourceRecord(
