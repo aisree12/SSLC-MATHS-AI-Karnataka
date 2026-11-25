@@ -416,7 +416,7 @@ object OpenWeightModelCatalog {
         onDeviceQuantizedModels.firstOrNull { it.modelId == modelId } ?: onDeviceQuantizedModels.first()
 
     fun defaultTextModel(provider: OpenWeightProvider): OpenWeightModelSpec =
-        models.firstOrNull { it.provider == provider && (!it.supportsVision || provider == OpenWeightProvider.GEMINI) }
+        models.firstOrNull { it.provider == provider }
             ?: models.first()
 
     fun defaultVisionModel(provider: OpenWeightProvider): OpenWeightModelSpec =
