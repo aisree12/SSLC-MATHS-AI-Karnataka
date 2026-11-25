@@ -18,6 +18,7 @@ import com.example.domain.TeachingLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeout
 
@@ -157,7 +158,7 @@ class AiTeacherRepository(
         try {
             streamTutorReply(studentMessage, chapterNumber, language, historySummary).collect { emit(it) }
         } catch (e: TimeoutCancellationException) {
-            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, emit)
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, this)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -171,7 +172,7 @@ class AiTeacherRepository(
         language: TeachingLanguage,
         historySummary: String,
         cloudError: Throwable,
-        emitReply: suspend (String) -> Unit
+        collector: FlowCollector<String>
     ) {
         val manager = onDeviceModelManager
         val engine = onDeviceLlmEngine
@@ -180,10 +181,10 @@ class AiTeacherRepository(
         }
         if (readySpec != null && engine != null) {
             val notice = "Cloud AI unavailable (network/provider/free-tier quota). Switching to downloaded on-device AI.\\n\\n"
-            emitReply(notice)
+            collector.emit(notice)
             try {
                 streamTutorReply(studentMessage, chapterNumber, language, historySummary, readySpec.modelId)
-                    .collect { emitReply(notice + it) }
+                    .collect { collector.emit(notice + it) }
                 return
             } catch (e: CancellationException) {
                 throw e
@@ -192,7 +193,7 @@ class AiTeacherRepository(
             }
         }
         Log.w(TAG, "Using structured offline lesson after cloud failure: " + cloudError.message)
-        emitReply(buildOfflineKsmkeResponse(studentMessage, chapterNumber, language))
+        collector.emit(buildOfflineKsmkeResponse(studentMessage, chapterNumber, language))
     }
     suspend fun evaluateAnswerPresentation(
         questionText: String,
