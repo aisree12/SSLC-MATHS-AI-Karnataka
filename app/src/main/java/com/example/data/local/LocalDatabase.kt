@@ -153,6 +153,23 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("UPDATE chapter_progress SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
                 db.execSQL("UPDATE daily_goals SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
                 db.execSQL("UPDATE topic_verification SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
+                val topicPrefixMap = "CASE " +
+                    "WHEN topicNumber GLOB '1.*' THEN '5' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '2.*' THEN '6' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '3.*' THEN '3' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '4.*' THEN '10' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '5.*' THEN '11' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '7.*' THEN '7' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '8.*' THEN '1' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '9.*' THEN '2' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '10.*' THEN '4' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '11.*' THEN '8' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '12.*' THEN '9' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '13.*' THEN '13' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '14.*' THEN '14' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '15.*' THEN '12' || substr(topicNumber, 3) " +
+                    "ELSE topicNumber END"
+                db.execSQL("UPDATE topic_verification SET topicNumber = $topicPrefixMap WHERE topicNumber GLOB '1.*' OR topicNumber GLOB '2.*' OR topicNumber GLOB '3.*' OR topicNumber GLOB '4.*' OR topicNumber GLOB '5.*' OR topicNumber GLOB '7.*' OR topicNumber GLOB '8.*' OR topicNumber GLOB '9.*' OR topicNumber GLOB '10.*' OR topicNumber GLOB '11.*' OR topicNumber GLOB '12.*' OR topicNumber GLOB '13.*' OR topicNumber GLOB '14.*' OR topicNumber GLOB '15.*'")
                 db.execSQL("UPDATE concept_stats SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
 
                 // Legacy chapter 6 meant Constructions; official chapter 6 means Triangles.
