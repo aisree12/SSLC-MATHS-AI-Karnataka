@@ -55,6 +55,7 @@ object IndependentMarkingEngine {
         }
 
         val studentNumbers = extractNumbers(student)
+        val finalLine = student.lineSequence().lastOrNull { it.isNotBlank() }.orEmpty()
         val checks = mutableListOf<AnswerStepCheck>()
         val missing = mutableListOf<String>()
         var awarded = 0.0
@@ -66,14 +67,16 @@ object IndependentMarkingEngine {
                 .replace(Regex("""[^\p{L}\p{N}./+−-]+"""), " ")
                 .trim()
             val expectedNumbers = extractNumbers(clean)
+            val evidenceText = if (clean.contains("final answer", ignoreCase = true)) finalLine else student
+            val evidenceNumbers = if (evidenceText === student) studentNumbers else extractNumbers(evidenceText)
             val numericEvidence = expectedNumbers.isNotEmpty() &&
-                expectedNumbers.all { expected -> studentNumbers.any { abs(it - expected) < 0.0001 } }
+                expectedNumbers.all { expected -> evidenceNumbers.any { abs(it - expected) < 0.0001 } }
             val anchors = clean.lowercase()
                 .split(Regex("""[^a-z0-9]+"""))
                 .filter { it.length >= 4 && it !in STOP_WORDS }
                 .distinct()
             val textualEvidence = anchors.size >= 2 &&
-                anchors.count { student.contains(it, ignoreCase = true) } >=
+                anchors.count { evidenceText.contains(it, ignoreCase = true) } >=
                 (anchors.size * 0.7).toInt().coerceAtLeast(2)
             val verifiable = expectedNumbers.isNotEmpty() || anchors.size >= 2
             val satisfied = verifiable && (numericEvidence || textualEvidence)
