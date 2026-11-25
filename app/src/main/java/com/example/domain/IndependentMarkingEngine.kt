@@ -68,7 +68,7 @@ object IndependentMarkingEngine {
                 .trim()
             val expectedNumbers = extractNumbers(clean)
             val evidenceText = if (clean.contains("final answer", ignoreCase = true)) finalLine else student
-            val evidenceNumbers = if (evidenceText === student) studentNumbers else extractNumbers(evidenceText)
+            val evidenceNumbers = if (clean.contains("final answer", ignoreCase = true)) extractNumbers(finalLine) else studentNumbers
             val numericEvidence = expectedNumbers.isNotEmpty() &&
                 expectedNumbers.all { expected -> evidenceNumbers.any { abs(it - expected) < 0.0001 } }
             val anchors = clean.lowercase()
