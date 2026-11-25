@@ -328,7 +328,7 @@ object MathVerificationEngine {
         val checks = mutableListOf<MathAuditCheckResult>()
 
         val ch1 = solveArithmeticProgression(3.0, 5.0, 20)
-        checks += MathAuditCheckResult(11, "Ch 5: 20th term & sum of AP 3, 8, 13...", "a20=98, S20=1010", ch1.finalAnswer,
+        checks += MathAuditCheckResult(5, "Ch 5: 20th term & sum of AP 3, 8, 13...", "a20=98, S20=1010", ch1.finalAnswer,
             abs(ch1.numericResults[0] - 98.0) < 1e-4 && abs(ch1.numericResults[1] - 1010.0) < 1e-4)
 
         val ch3 = solveLinearPair(1.0, 1.0, -14.0, 1.0, -1.0, -4.0)
@@ -336,11 +336,11 @@ object MathVerificationEngine {
             abs(ch3.numericResults[0] - 9.0) < 1e-4 && abs(ch3.numericResults[1] - 5.0) < 1e-4)
 
         val ch4 = solveCircleTangentLength(25.0, 7.0)
-        checks += MathAuditCheckResult(4, "Ch 10: Tangent length (OQ=25, r=7)", "24", ch4.finalAnswer,
+        checks += MathAuditCheckResult(10, "Ch 10: Tangent length (OQ=25, r=7)", "24", ch4.finalAnswer,
             abs(ch4.numericResults[0] - 24.0) < 1e-4)
 
         val ch5 = solveSectorAndSegment(10.0, 90.0, 3.14)
-        checks += MathAuditCheckResult(5, "Ch 11: Sector & minor segment (r=10, 90°)", "78.5 / 28.5", ch5.finalAnswer,
+        checks += MathAuditCheckResult(11, "Ch 11: Sector & minor segment (r=10, 90°)", "78.5 / 28.5", ch5.finalAnswer,
             abs(ch5.numericResults[1] - 78.5) < 0.05 && abs(ch5.numericResults[2] - 28.5) < 0.05)
 
         val ch7 = solveCoordinateGeometry(-1.0, 7.0, 4.0, -3.0, 2.0, 3.0)
@@ -352,7 +352,7 @@ object MathVerificationEngine {
             abs(ch8.numericResults[0] - 4.0) < 1e-4 && abs(ch8.numericResults[1] - 9696.0) < 1e-4)
 
         val ch10 = solveQuadratic(2.0, -7.0, 3.0)
-        checks += MathAuditCheckResult(10, "Ch 4: Roots of 2x² - 7x + 3 = 0", "3, 0.5", ch10.finalAnswer,
+        checks += MathAuditCheckResult(4, "Ch 4: Roots of 2x² - 7x + 3 = 0", "3, 0.5", ch10.finalAnswer,
             abs(ch10.numericResults[0] - 3.0) < 1e-4 && abs(ch10.numericResults[1] - 0.5) < 1e-4)
 
         val ch12 = solveElevationHeight(30.0, 30)
