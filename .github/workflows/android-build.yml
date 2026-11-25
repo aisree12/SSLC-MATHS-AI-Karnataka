@@ -41,6 +41,12 @@ jobs:
             printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY" > .env
           fi
 
+      - name: Create local debug signing keystore for CI
+        run: |
+          if [ ! -f debug.keystore ]; then
+            keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
       - name: Run unit tests and assemble debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
 

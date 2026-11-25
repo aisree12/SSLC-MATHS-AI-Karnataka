@@ -36,10 +36,10 @@ class AiTeacherRepository(
     private val onDeviceLlmEngine: OnDeviceLlmEngine? = null
 ) {
 
-    @Volatile
     fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean =
         openWeightClient.isProviderApiKeyConfigured(provider)
 
+    @Volatile
     var activeProvider: OpenWeightProvider = OpenWeightProvider.GEMINI_API_KEY
 
     @Volatile
