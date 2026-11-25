@@ -1,0 +1,41 @@
+package com.example.data.ksmke
+
+/** Official chapter index. Page references are printed textbook pages from the English contents pages. */
+data class OfficialSyllabusChapter(
+    val number: Int,
+    val titleEn: String,
+    val titleKn: String,
+    val part: Int,
+    val printedPages: String,
+    val sections: List<String>,
+    val kannadaParityVerified: Boolean = false
+)
+
+object OfficialSyllabus2026_27 {
+    const val edition = "KTBS / NCERT Class 10 Mathematics 2026–27"
+    const val chapterCount = 14
+    val chapters = listOf(
+        OfficialSyllabusChapter(1, "Real Numbers", "ವಾಸ್ತವ ಸಂಖ್ಯೆಗಳು", 1, "1–9", listOf("1.1–1.4")),
+        OfficialSyllabusChapter(2, "Polynomials", "ಬಹುಪದೋಕ್ತಿಗಳು", 1, "10–23", listOf("2.1–2.4")),
+        OfficialSyllabusChapter(3, "Pair of Linear Equations in Two Variables", "ಎರಡು ಚರಗಳಿರುವ ರೇಖೀಯ ಸಮೀಕರಣಗಳ ಜೋಡಿ", 1, "24–37", listOf("3.1–3.4")),
+        OfficialSyllabusChapter(4, "Quadratic Equations", "ವರ್ಗ ಸಮೀಕರಣಗಳು", 1, "38–47", listOf("4.1–4.5")),
+        OfficialSyllabusChapter(5, "Arithmetic Progressions", "ಸಮಾಂತರ ಶ್ರೇಢಿಗಳು", 1, "48–71", listOf("5.1–5.5")),
+        OfficialSyllabusChapter(6, "Triangles", "ತ್ರಿಭುಜಗಳು", 1, "72–96", listOf("6.1–6.5")),
+        OfficialSyllabusChapter(7, "Coordinate Geometry", "ನಿರ್ದೇಶಾಂಕ ಜ್ಯಾಮಿತಿ", 1, "98–111", listOf("7.1–7.4")),
+        OfficialSyllabusChapter(8, "Introduction to Trigonometry", "ತ್ರಿಕೋನಮಿತಿಯ ಪರಿಚಯ", 2, "1–20", listOf("8.1–8.5")),
+        OfficialSyllabusChapter(9, "Some Applications of Trigonometry", "ತ್ರಿಕೋನಮಿತಿಯ ಕೆಲವು ಅನ್ವಯಗಳು", 2, "21–31", listOf("9.1–9.2")),
+        OfficialSyllabusChapter(10, "Circles", "ವೃತ್ತಗಳು", 2, "32–41", listOf("10.1–10.4")),
+        OfficialSyllabusChapter(11, "Areas Related to Circles", "ವೃತ್ತಗಳಿಗೆ ಸಂಬಂಧಿಸಿದ ಕ್ಷೇತ್ರಫಲಗಳು", 2, "42–48", listOf("11.1–11.2")),
+        OfficialSyllabusChapter(12, "Surface Areas and Volumes", "ಮೇಲ್ಮೈ ವಿಸ್ತೀರ್ಣಗಳು ಮತ್ತು ಘನಫಲಗಳು", 2, "49–58", listOf("12.1–12.4")),
+        OfficialSyllabusChapter(13, "Statistics", "ಅಂಕಿಅಂಶಗಳು", 2, "59–88", listOf("13.1–13.5")),
+        OfficialSyllabusChapter(14, "Probability", "ಸಂಭವನೀಯತೆ", 2, "90–105", listOf("14.1–14.2"))
+    )
+    // These are legacy IDs from the old app, not new database primary keys.
+    // Old Constructions (6) is not a standalone official chapter and requires content review/merge.
+    val legacyChapterIdToOfficial = mapOf(
+        1 to 5, 2 to 6, 3 to 3, 4 to 10, 5 to 11, 6 to 6, 7 to 7, 8 to 1,
+        9 to 2, 10 to 4, 11 to 8, 12 to 9, 13 to 13, 14 to 14, 15 to 12
+    )
+    fun chapter(number: Int) = chapters.firstOrNull { it.number == number }
+    fun officialIdForLegacy(legacyId: Int) = legacyChapterIdToOfficial[legacyId]
+}
