@@ -528,4 +528,4 @@ internal object KsmkeChapterPapers {
         val officialId = OfficialSyllabus2026_27.officialIdForLegacy(legacyId) ?: return@mapNotNull null
         officialId to questions
     }.toMap()
-}}
+}
