@@ -220,7 +220,7 @@ fun AiTeacherScreen(
                         )
                         Text(
                             text = selectedChapter?.let { "Ch ${it.chapterNumber}: ${it.titleEn} (${it.titleKn})" }
-                                ?: "All 15 Karnataka SSLC Chapters",
+                                ?: "All 14 Karnataka SSLC Chapters",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
