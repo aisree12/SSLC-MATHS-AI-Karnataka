@@ -62,6 +62,18 @@ class MathVerificationEngineTest {
     }
 
     @Test
+    fun officialSyllabus_hasFourteenChaptersAndDistinctLegacyMappings() {
+        assertEquals(14, OfficialSyllabus2026_27.chapters.size)
+        assertEquals(5, OfficialSyllabus2026_27.officialIdForLegacy(1))
+        assertEquals(6, OfficialSyllabus2026_27.officialIdForLegacy(2))
+        assertEquals(null, OfficialSyllabus2026_27.officialIdForLegacy(6))
+        assertEquals("1–9", OfficialSyllabus2026_27.chapter(1)?.englishPrintedPages)
+        assertEquals("1–11", OfficialSyllabus2026_27.chapter(1)?.kannadaPrintedPages)
+        assertEquals("21–31", OfficialSyllabus2026_27.chapter(9)?.englishPrintedPages)
+        assertEquals("22–32", OfficialSyllabus2026_27.chapter(9)?.kannadaPrintedPages)
+    }
+
+    @Test
     fun ksmkeSyllabus_hasOfficial14ChaptersAnd80MarkExamPaper() {
         assertEquals(14, KsmkeSyllabusRepository.chapters.size)
         assertEquals((1..14).toList(), KsmkeSyllabusRepository.chapters.map { it.chapterNumber })
