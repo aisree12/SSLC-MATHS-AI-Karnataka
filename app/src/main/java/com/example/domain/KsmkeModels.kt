@@ -278,7 +278,7 @@ enum class OpenWeightProvider(
     val runsOnPhoneHardware: Boolean = false
 ) {
     GEMINI_API_KEY(
-        displayName = "Google Gemini API (Your API Key)",
+        displayName = "Google Gemini API (Free Tier • Your Key)",
         chatCompletionsUrl = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
         requiresApiKey = true,
         badge = "Google AI Studio API Key • Text + Vision"
@@ -370,13 +370,12 @@ object OpenWeightModelCatalog {
 
     val models: List<OpenWeightModelSpec> = listOf(
         // Google Gemini API-key models (Google AI Studio)
-        OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (API Key • Recommended)", "Gemini 3.8", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
-        OpenWeightModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (API Key • Fast)", "Gemini 3.5 Lite", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
+        OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (Free Tier • Recommended)", "Gemini 3.8", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
+        OpenWeightModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (Free Tier • Fast)", "Gemini 3.5 Lite", OpenWeightProvider.GEMINI_API_KEY, supportsVision = true),
 
         // Google Gemini via Firebase AI Logic (Keyless App Check)
         OpenWeightModelSpec("gemini-3.8-flash", "Gemini 3.8 Flash (Vision + Fast)", "Gemini 3", OpenWeightProvider.GEMINI, supportsVision = true),
         OpenWeightModelSpec("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (Ultra Fast)", "Gemini 3 Lite", OpenWeightProvider.GEMINI, supportsVision = true),
-        OpenWeightModelSpec("gemini-4-argon", "Gemini 4 Argon (STEM & Proofs)", "Gemini 4", OpenWeightProvider.GEMINI, supportsVision = true),
 
         // Real On-Device MediaPipe LiteRT Quantised Models
         OpenWeightModelSpec("qwen2.5-0.5b-q8-ondevice", "Qwen 2.5 0.5B INT8 (On-Device ~560 MB)", "Qwen On-Device", OpenWeightProvider.ON_DEVICE_OFFLINE),
