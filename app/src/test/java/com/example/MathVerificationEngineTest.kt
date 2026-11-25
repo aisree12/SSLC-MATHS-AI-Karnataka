@@ -213,7 +213,7 @@ class MathVerificationEngineTest {
     }
 
     @Test
-    fun textbookCoverageAudit_passesAll7StepsAcrossPages1To342AndVerifiesMath() {
+    fun textbookCoverageAudit_reportsUnverifiedSourceCoverageAndLimitedMathChecks() {
         val report = TextbookCoverageAuditEngine.runFullAudit()
         assertEquals(0, report.totalPagesExpected)
         assertEquals(0, report.pagesCoveredCount)
