@@ -18,6 +18,7 @@ import com.example.domain.TeachingLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeout
 
 private const val TAG = "AiTeacherRepo"
@@ -42,10 +43,10 @@ class AiTeacherRepository(
 
     fun isApiKeyConfigured(): Boolean = openWeightClient.isApiKeyConfigured()
 
-    private fun requireReadyOnDeviceModelFile(): java.io.File {
+    private fun requireReadyOnDeviceModelFile(modelId: String = activeModelId): java.io.File {
         val manager = onDeviceModelManager
             ?: throw IllegalStateException("On-device model manager is not initialized.")
-        val spec = OpenWeightModelCatalog.findOnDeviceSpec(activeModelId)
+        val spec = OpenWeightModelCatalog.findOnDeviceSpec(modelId)
         return manager.getReadyModelFile(spec.modelId)
             ?: throw IllegalStateException(
                 "${spec.displayName} (${spec.approxSizeLabel}) is not downloaded on this phone yet. " +
@@ -104,7 +105,8 @@ class AiTeacherRepository(
         studentMessage: String,
         chapterNumber: Int?,
         language: TeachingLanguage,
-        historySummary: String
+        historySummary: String,
+        forceLocalModelId: String? = null
     ): Flow<String> {
         val chapterContext = chapterNumber?.let {
             val ch = KsmkeSyllabusRepository.getChapter(it)
@@ -126,10 +128,10 @@ class AiTeacherRepository(
             appendLine("Student says: $studentMessage")
         }
 
-        if (activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+        if (forceLocalModelId != null || activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
             val engine = onDeviceLlmEngine
                 ?: throw IllegalStateException("On-device MediaPipe LLM runtime is not initialized.")
-            val modelFile = requireReadyOnDeviceModelFile()
+            val modelFile = requireReadyOnDeviceModelFile(forceLocalModelId ?: activeModelId)
             return engine.streamCompletion(
                 modelFile = modelFile,
                 systemInstruction = gurujiSystemPrompt,
@@ -145,6 +147,53 @@ class AiTeacherRepository(
         )
     }
 
+    /** Cloud-first teacher stream with automatic local-AI / structured-guide recovery. */
+    fun streamTutorReplyWithFallback(
+        studentMessage: String,
+        chapterNumber: Int?,
+        language: TeachingLanguage,
+        historySummary: String
+    ): Flow<String> = flow {
+        try {
+            streamTutorReply(studentMessage, chapterNumber, language, historySummary).collect { emit(it) }
+        } catch (e: TimeoutCancellationException) {
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, emit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, emit)
+        }
+    }
+
+    private suspend fun recoverTeacherReply(
+        studentMessage: String,
+        chapterNumber: Int?,
+        language: TeachingLanguage,
+        historySummary: String,
+        cloudError: Throwable,
+        emitReply: suspend (String) -> Unit
+    ) {
+        val manager = onDeviceModelManager
+        val engine = onDeviceLlmEngine
+        val readySpec = OpenWeightModelCatalog.onDeviceQuantizedModels.firstOrNull { spec ->
+            manager?.getReadyModelFile(spec.modelId) != null
+        }
+        if (readySpec != null && engine != null) {
+            val notice = "Cloud AI unavailable (network/provider/free-tier quota). Switching to downloaded on-device AI.\\n\\n"
+            emitReply(notice)
+            try {
+                streamTutorReply(studentMessage, chapterNumber, language, historySummary, readySpec.modelId)
+                    .collect { emitReply(notice + it) }
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (localError: Exception) {
+                Log.w(TAG, "On-device fallback failed: " + localError.message, localError)
+            }
+        }
+        Log.w(TAG, "Using structured offline lesson after cloud failure: " + cloudError.message)
+        emitReply(buildOfflineKsmkeResponse(studentMessage, chapterNumber, language))
+    }
     suspend fun evaluateAnswerPresentation(
         questionText: String,
         expectedAnswer: String,
