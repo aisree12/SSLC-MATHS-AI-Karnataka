@@ -379,7 +379,7 @@ fun AiTeacherScreen(
                 when {
                     selectedProvider == OpenWeightProvider.GEMINI_API_KEY -> {
                         Text(
-                            text = "Google AI Studio Gemini API key • Free-tier model selected. Keep GEMINI_API_KEY in local/AI Studio Secrets; do not commit the key. Usage is subject to the model's rate limits and availability.",
+                            text = "Google AI Studio Gemini API key • Free-tier model selected. Keep GEMINI_API_KEY in local/AI Studio Secrets; do not commit the key. Usage is subject to model rate limits and availability. Free-tier prompts may be used to improve Google products; do not send student names or personal data.",
                             style = MaterialTheme.typography.labelSmall,
                             color = EmeraldChalk
                         )
