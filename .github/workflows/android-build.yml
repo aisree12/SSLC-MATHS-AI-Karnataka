@@ -33,6 +33,14 @@ jobs:
         with:
           gradle-version: "9.3.1"
 
+      - name: Load optional Gemini key from GitHub Actions secret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            printf 'GEMINI_API_KEY=%s\\n' "$GEMINI_API_KEY" > .env
+          fi
+
       - name: Run unit tests and assemble debug APK
         run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
 
