@@ -109,7 +109,10 @@ class MathVerificationEngineTest {
     fun dualLibraryAndExpandedPyqArchive_computeRealRecurrenceStats() {
         assertTrue(OfficialSourceLibrary.officialDocuments.size >= 5)
         assertEquals(6, AiTeachingLibrary.sixLayerEngine.size)
-        assertTrue(AiTeachingLibrary.buildIndexedCatalog().size >= 29)
+        val indexedCatalog = AiTeachingLibrary.buildIndexedCatalog()
+        val syllabusTopicCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
+        assertTrue("Indexed concept catalog should not be empty", indexedCatalog.isNotEmpty())
+        assertEquals("Every syllabus topic should have exactly one indexed concept", syllabusTopicCount, indexedCatalog.size)
 
         assertTrue("Expected >= 60 PYQ entries, got ${KsmkeSyllabusRepository.pyqQuestions.size}", KsmkeSyllabusRepository.pyqQuestions.size >= 60)
         val stats = PyqAnalyticsEngine.computeRecurrenceStats(KsmkeSyllabusRepository.pyqQuestions)
