@@ -144,6 +144,12 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("CREATE TABLE IF NOT EXISTS legacy_topic_verification_v2 AS SELECT * FROM topic_verification")
                 db.execSQL("CREATE TABLE IF NOT EXISTS legacy_concept_stats_v2 AS SELECT * FROM concept_stats")
 
+                // Remove only legacy Constructions rows before the ID 2 -> official Chapter 6 mapping.
+                db.execSQL("DELETE FROM chapter_progress WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM daily_goals WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM topic_verification WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM concept_stats WHERE chapterNumber = 6")
+
                 val mappedIds = "1,2,3,4,5,7,8,9,10,11,12,13,14,15"
                 val mapping = "CASE chapterNumber " +
                     "WHEN 1 THEN 5 WHEN 2 THEN 6 WHEN 3 THEN 3 WHEN 4 THEN 10 " +
@@ -172,12 +178,6 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("UPDATE topic_verification SET topicNumber = $topicPrefixMap WHERE topicNumber GLOB '1.*' OR topicNumber GLOB '2.*' OR topicNumber GLOB '3.*' OR topicNumber GLOB '4.*' OR topicNumber GLOB '5.*' OR topicNumber GLOB '7.*' OR topicNumber GLOB '8.*' OR topicNumber GLOB '9.*' OR topicNumber GLOB '10.*' OR topicNumber GLOB '11.*' OR topicNumber GLOB '12.*' OR topicNumber GLOB '13.*' OR topicNumber GLOB '14.*' OR topicNumber GLOB '15.*'")
                 db.execSQL("UPDATE concept_stats SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
 
-                // Legacy chapter 6 meant Constructions; official chapter 6 means Triangles.
-                // Keep those old rows in the archive instead of attaching them to the wrong subject.
-                db.execSQL("DELETE FROM chapter_progress WHERE chapterNumber = 6")
-                db.execSQL("DELETE FROM daily_goals WHERE chapterNumber = 6")
-                db.execSQL("DELETE FROM topic_verification WHERE chapterNumber = 6")
-                db.execSQL("DELETE FROM concept_stats WHERE chapterNumber = 6")
             }
         }
 
