@@ -94,12 +94,20 @@ object IndependentMarkingEngine {
         }
 
         val expectedFinal = extractNumbers(officialAnswer)
+        val finalLine = student.lines().lastOrNull { it.isNotBlank() }.orEmpty()
         val finalMatch = if (expectedFinal.isNotEmpty()) {
-            MathVerificationEngine.verifyNumericAnswer(student, expectedFinal).matched
+            MathVerificationEngine.verifyNumericAnswer(finalLine, expectedFinal).matched
         } else null
         val expectedUnit = extractExpectedUnit(officialAnswer)
-        val hasUnit = expectedUnit == null || student.contains(expectedUnit, ignoreCase = true)
-        if (finalMatch == false) missing += "Final answer does not match numeric answer key: $officialAnswer"
+        val hasUnit = expectedUnit == null || finalLine.contains(expectedUnit, ignoreCase = true)
+        if (finalMatch == false) {
+            missing += "Final answer does not match numeric answer key: $officialAnswer"
+            val finalRubricIndex = rubric.indexOfLast {
+                val label = it.text.lowercase()
+                label.contains("final answer") || label.contains("final result") || label.contains("conclusion")
+            }
+            if (finalRubricIndex >= 0) awarded = (awarded - rubric[finalRubricIndex].marks).coerceAtLeast(0.0)
+        }
         if (finalMatch == true && !hasUnit) missing += "Final answer unit '$expectedUnit' is missing."
         checks += AnswerStepCheck(
             "Final answer cross-check",
