@@ -137,7 +137,7 @@ fun KsmkeSyllabusScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Complete 342/342-Page KTBS Syllabus, Bilingual Definitions, Ex 1.1–15.4 Index, 5 Board Proofs & 7 Canvas Labs.",
+                        text = "Official 14-Chapter KTBS 2026–27 Index, Curated Bilingual Notes, Practice Questions & Interactive Math Labs. Page-by-page source audit remains pending.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFE2E8F0)
                     )
@@ -190,7 +190,7 @@ fun KsmkeSyllabusScreen(
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(
-                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Audit (pp. 1–342)",
+                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Source Audit (review pending)",
                                 color = Color.White
                             )
                         }

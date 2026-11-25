@@ -39,9 +39,7 @@ data class ChapterTextbookSupplement(
 )
 
 /**
- * Curated supplementary textbook inventory filling definitions, exercise-by-exercise subquestion
- * guides (Ex 1.1–Ex 15.4), bilingual glossary items, and diagram specs across pp. 1–342
- * for the Karnataka KTBS Revised 2026–27 Class 10 Mathematics curriculum.
+ * Legacy curated supplementary inventory. Its exercise IDs, page references and chapter numbering are retained for migration compatibility only; they are not certified as matching the official 2026–27 source books.
  */
 object KsmkeSupplementLibrary {
 
