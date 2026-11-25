@@ -665,7 +665,11 @@ object KsmkeSyllabusRepository {
             textbookEdition = OfficialSyllabus2026_27.edition,
             pageRange = "English pp. ${official.englishPrintedPages}; Kannada pp. ${official.kannadaPrintedPages}",
             detailedTopics = legacy.detailedTopics.map { topic ->
-                topic.copy(topicNumber = "${official.number}.${topic.topicNumber.substringAfter('.', topic.topicNumber)}")
+                topic.copy(
+                    topicNumber = "${official.number}.${topic.topicNumber.substringAfter('.', topic.topicNumber)}",
+                    sourcePageRef = "Legacy page reference; official 2026–27 source page not yet verified.",
+                    exerciseRef = "Legacy exercise reference; official exercise mapping not yet verified."
+                )
             }
         )
     }.sortedBy { it.chapterNumber }
