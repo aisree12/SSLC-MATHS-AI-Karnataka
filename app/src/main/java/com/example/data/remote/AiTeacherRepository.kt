@@ -71,12 +71,61 @@ class AiTeacherRepository(
                 )
             }
         }
-        return withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = systemInstruction,
-                userPrompt = userPrompt
+        return try {
+            withTimeout(60_000L) {
+                openWeightClient.completeChat(
+                    provider = activeProvider,
+                    modelId = activeModelId,
+                    systemInstruction = systemInstruction,
+                    userPrompt = userPrompt
+                )
+            }
+        } catch (e: TimeoutCancellationException) {
+            completeWithDownloadedLocalModel(systemInstruction, userPrompt, e)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            completeWithDownloadedLocalModel(systemInstruction, userPrompt, e)
+        }
+    }
+
+    private suspend fun completeWithDownloadedLocalModel(
+        systemInstruction: String,
+        userPrompt: String,
+        cloudError: Throwable
+    ): String {
+        val manager = onDeviceModelManager
+            ?: throw IllegalStateException(
+                "Cloud AI failed and no on-device model manager is available. Install a .task model or use the offline KSMKE lesson.",
+                cloudError
+            )
+        val engine = onDeviceLlmEngine
+            ?: throw IllegalStateException(
+                "Cloud AI failed and the on-device inference runtime is unavailable.",
+                cloudError
+            )
+        val readySpec = OpenWeightModelCatalog.onDeviceQuantizedModels.firstOrNull {
+            manager.getReadyModelFile(it.modelId) != null
+        } ?: throw IllegalStateException(
+            "Cloud AI failed (possibly free-tier quota). Download or import a quantised .task model to enable automatic offline AI.",
+            cloudError
+        )
+        val modelFile = manager.getReadyModelFile(readySpec.modelId)
+            ?: throw IllegalStateException("Downloaded on-device model is no longer available.", cloudError)
+        return try {
+            withTimeout(120_000L) {
+                engine.complete(
+                    modelFile = modelFile,
+                    systemInstruction = systemInstruction,
+                    userPrompt = userPrompt
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Cloud AI and downloaded on-device AI both failed. The offline KSMKE guide remains available in Teacher Chat.",
+                e
             )
         }
     }
