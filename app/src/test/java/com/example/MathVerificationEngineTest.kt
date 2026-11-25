@@ -15,6 +15,7 @@ import com.example.domain.MasteryStatus
 import com.example.domain.MathVerificationEngine
 import com.example.domain.OpenWeightModelCatalog
 import com.example.domain.OpenWeightProvider
+import com.example.domain.QuestionSource
 import com.example.domain.WeaknessAndPlannerEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -113,7 +114,11 @@ class MathVerificationEngineTest {
         assertTrue("Expected >= 60 PYQ entries, got ${KsmkeSyllabusRepository.pyqQuestions.size}", KsmkeSyllabusRepository.pyqQuestions.size >= 60)
         val stats = PyqAnalyticsEngine.computeRecurrenceStats(KsmkeSyllabusRepository.pyqQuestions)
         assertTrue(stats.isNotEmpty())
-        assertTrue(stats.first().occurrences >= 2)
+        val expectedOfficialCount = KsmkeSyllabusRepository.pyqQuestions.count {
+            it.source == QuestionSource.HISTORICAL_BOARD || it.source == QuestionSource.OFFICIAL_MODEL_PAPER
+        }
+        assertEquals(expectedOfficialCount, stats.sumOf { it.occurrences })
+        assertTrue(stats.all { it.occurrences > 0 })
     }
 
     @Test
