@@ -512,6 +512,26 @@ object KsmkeSupplementLibrary {
         byChapter.values.mapNotNull { supplement ->
             val officialId = OfficialSyllabus2026_27.officialIdForLegacy(supplement.chapterNumber)
                 ?: return@mapNotNull null
-            officialId to supplement.copy(chapterNumber = officialId)
+            val official = OfficialSyllabus2026_27.chapter(officialId) ?: return@mapNotNull null
+            val bounds = Regex("(\\d+)\\s*[–-]\\s*(\\d+)").find(official.englishPrintedPages)
+            val start = bounds?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val end = bounds?.groupValues?.get(2)?.toIntOrNull() ?: 0
+            officialId to supplement.copy(
+                chapterNumber = officialId,
+                startPage = start,
+                endPage = end,
+                definitions = supplement.definitions.map {
+                    it.copy(pageRef = "Chapter-level page range only; exact definition page pending verification.")
+                },
+                exercises = supplement.exercises.map {
+                    it.copy(
+                        exerciseId = "Legacy ${it.exerciseId} (official exercise number unverified)",
+                        pageRef = "Exact official exercise page pending source comparison."
+                    )
+                },
+                diagrams = supplement.diagrams.map {
+                    it.copy(pageRef = "Chapter-level figure inventory pending source comparison.")
+                }
+            )
         }.toMap()
 }

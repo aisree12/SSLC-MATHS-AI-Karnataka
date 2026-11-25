@@ -16,20 +16,22 @@ import com.example.domain.TopicDetailedNote
  */
 object KsmkeSyllabusRepository {
 
-    private fun detailedTopicsFor(chapterNumber: Int): List<TopicDetailedNote> =
-        (KsmkeDetailedNotesPart1.byChapter[chapterNumber]
+    private fun detailedTopicsFor(chapterNumber: Int): List<TopicDetailedNote> {
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(chapterNumber)
+        val official = officialId?.let { OfficialSyllabus2026_27.chapter(it) }
+        return (KsmkeDetailedNotesPart1.byChapter[chapterNumber]
             ?: KsmkeDetailedNotesPart2.byChapter[chapterNumber])
             .orEmpty()
             .map { note ->
-                val src = OfficialSourceLibrary.topicSourceIndex[note.topicNumber]
-                if (src != null) {
-                    note.copy(
-                        sourcePageRef = src.sourcePageRef,
-                        exerciseRef = src.exerciseRef,
-                        dikshaModuleTitle = src.dikshaModuleTitle
-                    )
-                } else note
+                note.copy(
+                    sourcePageRef = official?.let {
+                        "Chapter-level index only: English pp. ${it.englishPrintedPages}; Kannada pp. ${it.kannadaPrintedPages}. Topic page not verified."
+                    } ?: "Legacy topic reference; official source page pending.",
+                    exerciseRef = "Legacy exercise reference; official exercise mapping pending source comparison.",
+                    dikshaModuleTitle = "DIKSHA resource mapping pending verification"
+                )
             }
+    }
 
     private fun enrichChapter(ch: KsmkeChapter): KsmkeChapter {
         val supp = KsmkeSupplementLibrary.byChapter[ch.chapterNumber]
@@ -661,7 +663,10 @@ object KsmkeSyllabusRepository {
             titleEn = official.titleEn,
             titleKn = official.titleKn,
             textbookEdition = OfficialSyllabus2026_27.edition,
-            pageRange = "English pp. ${official.englishPrintedPages}; Kannada pp. ${official.kannadaPrintedPages}"
+            pageRange = "English pp. ${official.englishPrintedPages}; Kannada pp. ${official.kannadaPrintedPages}",
+            detailedTopics = legacy.detailedTopics.map { topic ->
+                topic.copy(topicNumber = "${official.number}.${topic.topicNumber.substringAfter('.', topic.topicNumber)}")
+            }
         )
     }.sortedBy { it.chapterNumber }
 

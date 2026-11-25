@@ -169,7 +169,7 @@ object OfficialSourceLibrary {
     fun auditChapter(chapterNumber: Int): ChapterCorpusAudit {
         val ch = KsmkeSyllabusRepository.getChapter(chapterNumber)
         val supp = KsmkeSupplementLibrary.byOfficialChapter[chapterNumber]
-        val exRefs = supp?.exercises?.joinToString(", ") { it.exerciseId }
+        val exRefs = supp?.exercises?.joinToString(", ") { it.exerciseId }?.let { "Legacy references only: $it" }
             ?: ch.detailedTopics.mapNotNull { topicSourceIndex[it.topicNumber]?.exerciseRef }.joinToString(", ")
                 .ifBlank { "Mapped in KTBS Index" }
         val status = SyllabusCertificationState.PARTIAL_CURATED
