@@ -151,7 +151,7 @@ class MathVerificationEngineTest {
         val stats = listOf(
             ConceptStatEntity(
                 conceptTag = "Discriminant & Nature of Roots",
-                chapterNumber = 10,
+                chapterNumber = 4,
                 attempts = 4,
                 errors = 3,
                 confidenceRating = 2,
@@ -166,12 +166,12 @@ class MathVerificationEngineTest {
         val plan = WeaknessAndPlannerEngine.buildAutomaticStudyPlan(
             daysUntilExam = 15,
             dailyStudyMinutes = 120,
-            masteryByChapter = mapOf(10 to MasteryStatus.NEEDS_FOUNDATION),
+            masteryByChapter = mapOf(4 to MasteryStatus.NEEDS_FOUNDATION),
             chapterProgressList = emptyList(),
             weaknesses = insights
         )
         assertEquals(4, plan.size)
-        assertNotNull(plan.firstOrNull { it.chapterNumber == 10 })
+        assertNotNull(plan.firstOrNull { it.chapterNumber == 4 })
         assertEquals(120, plan.sumOf { it.dailyMinutes })
     }
 

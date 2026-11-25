@@ -72,7 +72,7 @@ class OpenWeightAiClient {
         isUsableKey(BuildConfig.OPENAI_COMPAT_API_KEY.trim(), PLACEHOLDER_KEY) ||
             isUsableKey(BuildConfig.GEMINI_API_KEY.trim(), PLACEHOLDER_GEMINI_KEY)
 
-    private fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean = when (provider) {
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean = when (provider) {
         OpenWeightProvider.GEMINI_API_KEY -> isUsableKey(BuildConfig.GEMINI_API_KEY.trim(), PLACEHOLDER_GEMINI_KEY)
         else -> isUsableKey(BuildConfig.OPENAI_COMPAT_API_KEY.trim(), PLACEHOLDER_KEY)
     }

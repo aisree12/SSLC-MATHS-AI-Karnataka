@@ -135,6 +135,9 @@ class SslcStudyViewModel(
     val isOpenAiKeyConfigured: Boolean
         get() = aiTeacher.isApiKeyConfigured()
 
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean =
+        aiTeacher.isProviderApiKeyConfigured(provider)
+
     private val _chatTurns = MutableStateFlow(
         listOf(
             ChatTurn(

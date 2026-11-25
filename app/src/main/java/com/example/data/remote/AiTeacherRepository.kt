@@ -37,6 +37,9 @@ class AiTeacherRepository(
 ) {
 
     @Volatile
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean =
+        openWeightClient.isProviderApiKeyConfigured(provider)
+
     var activeProvider: OpenWeightProvider = OpenWeightProvider.GEMINI_API_KEY
 
     @Volatile
