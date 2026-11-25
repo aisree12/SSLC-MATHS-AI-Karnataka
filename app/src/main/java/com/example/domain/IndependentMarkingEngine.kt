@@ -97,7 +97,6 @@ object IndependentMarkingEngine {
         }
 
         val expectedFinal = extractNumbers(officialAnswer)
-        val finalLine = student.lines().lastOrNull { it.isNotBlank() }.orEmpty()
         val finalMatch = if (expectedFinal.isNotEmpty()) {
             MathVerificationEngine.verifyNumericAnswer(finalLine, expectedFinal).matched
         } else null
