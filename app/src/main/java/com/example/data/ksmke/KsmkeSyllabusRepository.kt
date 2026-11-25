@@ -18,7 +18,18 @@ object KsmkeSyllabusRepository {
 
     private fun detailedTopicsFor(chapterNumber: Int): List<TopicDetailedNote> =
         (KsmkeDetailedNotesPart1.byChapter[chapterNumber]
-            ?: KsmkeDetailedNotesPart2.byChapter[chapterNumber]).orEmpty()
+            ?: KsmkeDetailedNotesPart2.byChapter[chapterNumber])
+            .orEmpty()
+            .map { note ->
+                val src = OfficialSourceLibrary.topicSourceIndex[note.topicNumber]
+                if (src != null) {
+                    note.copy(
+                        sourcePageRef = src.sourcePageRef,
+                        exerciseRef = src.exerciseRef,
+                        dikshaModuleTitle = src.dikshaModuleTitle
+                    )
+                } else note
+            }
 
     val chapters: List<KsmkeChapter> = listOf(
         KsmkeChapter(
@@ -1144,7 +1155,37 @@ object KsmkeSyllabusRepository {
             requiredMethod = "Combined cylinder + sphere mensuration",
             commonMistakes = "Subtracting r only once instead of 2r from capsule length."
         )
-    )
+    ).map { q ->
+        q.copy(conceptTag = q.conceptTag.ifBlank { canonicalConceptTagFor(q) })
+    } + PyqArchivePart1.questions + PyqArchivePart2.questions
+
+    private fun canonicalConceptTagFor(q: PyqQuestion): String = when {
+        q.chapterNumber == 1 && (q.questionEn.contains("sum", true) || q.questionEn.contains("S₁₀", true)) -> "AP Sum of n Terms (Sn)"
+        q.chapterNumber == 1 -> "AP nth Term Formula"
+        q.chapterNumber == 2 && q.questionEn.contains("Proportionality", true) -> "Thales BPT Proof & Application"
+        q.chapterNumber == 2 -> "Area Ratio of Similar Triangles"
+        q.chapterNumber == 3 && q.questionEn.contains("graph", true) -> "Graphical Solution of Linear Pair"
+        q.chapterNumber == 3 && q.questionEn.contains("parallel", true) -> "Consistency Ratios (a1/a2, b1/b2)"
+        q.chapterNumber == 3 -> "Elimination & Substitution Method"
+        q.chapterNumber == 4 -> "External Tangents Equal Proof"
+        q.chapterNumber == 5 -> "Arc Length & Sector Area"
+        q.chapterNumber == 6 -> "Tangents & Similar Triangle Construction"
+        q.chapterNumber == 7 && q.questionEn.contains("midpoint", true) -> "Section & Midpoint Formula"
+        q.chapterNumber == 7 -> "Distance Formula"
+        q.chapterNumber == 8 && q.questionEn.contains("irrational", true) -> "Irrationality Contradiction Proof"
+        q.chapterNumber == 8 -> "HCF × LCM Product Rule"
+        q.chapterNumber == 9 -> "Zeroes & Coefficients Relation"
+        q.chapterNumber == 10 && q.questionEn.contains("discriminant", true) -> "Discriminant & Nature of Roots"
+        q.chapterNumber == 10 -> "Quadratic Formula & Word Problems"
+        q.chapterNumber == 11 && q.questionEn.contains("Prove", true) -> "Trigonometric Identity Proofs"
+        q.chapterNumber == 11 -> "Standard Angles & Identities"
+        q.chapterNumber == 12 -> "Heights & Distances (Elevation/Depression)"
+        q.chapterNumber == 13 && q.questionEn.contains("empirical", true) -> "Empirical Relation (Mean/Median/Mode)"
+        q.chapterNumber == 13 -> "Grouped Mean, Mode & Median"
+        q.chapterNumber == 14 -> "Classical & Complementary Probability"
+        q.chapterNumber == 15 -> "Combined Solids & Frustum Volume"
+        else -> q.topic
+    }
 
     fun getChapter(chapterNumber: Int): KsmkeChapter =
         chapters.firstOrNull { it.chapterNumber == chapterNumber } ?: chapters.first()

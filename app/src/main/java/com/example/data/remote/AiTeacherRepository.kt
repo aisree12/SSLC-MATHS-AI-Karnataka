@@ -6,135 +6,64 @@ import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.domain.ChapterQuestionPaper
 import com.example.domain.DifficultyLevel
 import com.example.domain.MathVerificationEngine
+import com.example.domain.OpenWeightModelCatalog
+import com.example.domain.OpenWeightProvider
 import com.example.domain.PyqQuestion
 import com.example.domain.QuestionFormat
 import com.example.domain.QuestionSource
 import com.example.domain.TargetedPaperQuestion
 import com.example.domain.TeachingLanguage
-import com.google.firebase.Firebase
-import com.google.firebase.ai.ai
-import com.google.firebase.ai.type.Schema
-import com.google.firebase.ai.type.content
-import com.google.firebase.ai.type.generationConfig
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeout
-import org.json.JSONObject
 
 private const val TAG = "AiTeacherRepo"
 
-class AiTeacherRepository {
+/**
+ * SSLC Mathematics AI Teacher Repository powered exclusively by free open-weight
+ * OpenAI-compatible models (Qwen 2.5 / Qwen 3 / Qwen 2.5-VL, DeepSeek R1, Llama 3.3,
+ * Mistral, and Local Ollama) plus deterministic offline KSMKE fallback.
+ */
+class AiTeacherRepository(
+    private val openWeightClient: OpenWeightAiClient = OpenWeightAiClient()
+) {
 
-    private val tutorModel by lazy {
-        Firebase.ai.generativeModel(
-            modelName = "gemini-3.8-flash",
-            systemInstruction = content {
-                text(
-                    """
-                    You are "Guruji", a patient, warm, encouraging Karnataka SSLC Class 10 Mathematics AI Teacher.
-                    Your student is preparing for the KSEAB Karnataka SSLC Class 10 Board Exam (80 Marks, 38 Questions).
-                    
-                    CORE PERSONALITY RULES:
-                    - Patient, disciplined, encouraging, and NEVER humiliating. Never call a student weak or slow.
-                    - If a student makes a mistake, first acknowledge what part of their thinking is right, then gently fix the exact step.
-                    - Never promise 100/100; give realistic exam readiness coaching.
-                    - Never invent a fake past-paper year. Distinguish KSEAB syllabus concepts vs practice problems.
-                    
-                    TEACHING SEQUENCE (Follow for conceptual questions like "Why do we use the quadratic formula?"):
-                    1. Explain the core concept simply.
-                    2. Show a tiny relatable example.
-                    3. Explain why simpler methods sometimes get stuck.
-                    4. Introduce the formula/theorem clearly.
-                    5. Show a clean step-by-step board-exam presentation (Given -> Formula -> Substitution -> Calculation -> Highlighted Answer).
-                    6. End with ONE short practice question and invite the student to try it!
-                    
-                    Keep formatting clean, crisp, and mobile-readable (no noisy LaTeX dollars; use clean Unicode math like x², √, Δ, ∠, △, π, θ).
-                    """.trimIndent()
-                )
-            }
-        )
-    }
+    @Volatile
+    var activeProvider: OpenWeightProvider = OpenWeightProvider.OPENROUTER_FREE
 
-    private val practiceJsonSchema = Schema.obj(
-        properties = mapOf(
-            "questions" to Schema.array(
-                items = Schema.obj(
-                    properties = mapOf(
-                        "questionEn" to Schema.string(description = "Clear Karnataka SSLC Class 10 board-format question in English"),
-                        "questionKn" to Schema.string(description = "Kannada translation of the question"),
-                        "marks" to Schema.integer(description = "Marks allocated: 1, 2, 3, or 4"),
-                        "officialAnswer" to Schema.string(description = "Final exact answer with units"),
-                        "markingPoints" to Schema.array(
-                            items = Schema.string(),
-                            description = "3 to 4 step-by-step board marking points"
-                        ),
-                        "commonMistakes" to Schema.string(description = "One common mistake students make on this question")
-                    )
-                ),
-                description = "List of generated practice questions"
-            )
-        )
-    )
+    @Volatile
+    var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.OPENROUTER_FREE).id
 
-    private val generatorModel by lazy {
-        Firebase.ai.generativeModel(
-            modelName = "gemini-3.8-flash",
-            generationConfig = generationConfig {
-                responseMimeType = "application/json"
-                responseSchema = practiceJsonSchema
-            }
-        )
-    }
+    fun isApiKeyConfigured(): Boolean = openWeightClient.isApiKeyConfigured()
 
-    private val chapterPaperSchema = Schema.obj(
-        properties = mapOf(
-            "paperTitle" to Schema.string(description = "Title for the AI PYQ-targeted chapter question paper"),
-            "pyqBlueprintSummary" to Schema.string(description = "Concise summary explaining past KSEAB board pattern and topic probability weights for this chapter"),
-            "questions" to Schema.array(
-                items = Schema.obj(
-                    properties = mapOf(
-                        "sectionLabel" to Schema.string(description = "Section I (1M MCQ), Section II (1M VSA), Section III (2M), Section IV (3M), or Section V (4M)"),
-                        "marks" to Schema.integer(description = "Marks: 1, 2, 3, or 4"),
-                        "probabilityBadge" to Schema.string(description = "Historical pattern likelihood label like '91% High-Yield Pattern' or '84% PYQ Variant'"),
-                        "pyqTargetNote" to Schema.string(description = "Which recurring PYQ concept this newly invented practice question targets without inventing fake exam years"),
-                        "questionEn" to Schema.string(description = "Question text in English"),
-                        "questionKn" to Schema.string(description = "Kannada translation of the question"),
-                        "mcqOptions" to Schema.array(
-                            items = Schema.string(),
-                            description = "4 option strings if MCQ, otherwise empty array []"
-                        ),
-                        "correctMcqIndex" to Schema.integer(description = "0-based correct option index if MCQ, otherwise -1"),
-                        "officialAnswer" to Schema.string(description = "Exact final answer with units"),
-                        "stepByStepSolution" to Schema.array(
-                            items = Schema.string(),
-                            description = "Complete step-by-step board marking solution lines"
-                        ),
-                        "commonMistake" to Schema.string(description = "Specific examiner warning / common student error")
-                    )
-                ),
-                description = "6 to 8 graded chapterwise questions from 1M MCQs up to 3M/4M"
-            )
-        )
-    )
-
-    private val chapterPaperModel by lazy {
-        Firebase.ai.generativeModel(
-            modelName = "gemini-3.8-flash",
-            generationConfig = generationConfig {
-                responseMimeType = "application/json"
-                responseSchema = chapterPaperSchema
-            }
-        )
-    }
+    private val gurujiSystemPrompt = """
+        You are "Guruji", a patient, warm, encouraging Karnataka SSLC Class 10 Mathematics AI Teacher.
+        Your student is preparing for the KSEAB Karnataka SSLC Class 10 Board Exam (80 Marks, 38 Questions).
+        
+        CORE PERSONALITY RULES:
+        - Patient, disciplined, encouraging, and NEVER humiliating. Never call a student weak or slow.
+        - If a student makes a mistake, first acknowledge what part of their thinking is right, then gently fix the exact step.
+        - Never promise 100/100; give realistic exam readiness coaching.
+        - Never invent a fake past-paper year. Distinguish KSEAB syllabus concepts vs practice problems.
+        
+        TEACHING SEQUENCE (Follow for conceptual questions like "Why do we use the quadratic formula?"):
+        1. Explain the core concept simply.
+        2. Show a tiny relatable example.
+        3. Explain why simpler methods sometimes get stuck.
+        4. Introduce the formula/theorem clearly.
+        5. Show a clean step-by-step board-exam presentation (Given -> Formula -> Substitution -> Calculation -> Highlighted Answer).
+        6. End with ONE short practice question and invite the student to try it!
+        
+        Keep formatting clean, crisp, and mobile-readable (no noisy LaTeX dollars; use clean Unicode math like x², √, Δ, ∠, △, π, θ).
+    """.trimIndent()
 
     fun streamTutorReply(
         studentMessage: String,
         chapterNumber: Int?,
         language: TeachingLanguage,
         historySummary: String
-    ): Flow<String> = flow {
+    ): Flow<String> {
         val chapterContext = chapterNumber?.let {
             val ch = KsmkeSyllabusRepository.getChapter(it)
             "Active Chapter: Ch ${ch.chapterNumber} - ${ch.titleEn} (${ch.titleKn}). Key formulas: ${ch.keyFormulas.joinToString("; ")}."
@@ -155,19 +84,12 @@ class AiTeacherRepository {
             appendLine("Student says: $studentMessage")
         }
 
-        val accumulated = StringBuilder()
-        withTimeout(60_000L) {
-            tutorModel.generateContentStream(prompt).collect { chunk ->
-                val part = chunk.text.orEmpty()
-                if (part.isNotEmpty()) {
-                    accumulated.append(part)
-                    emit(accumulated.toString())
-                }
-            }
-        }
-        if (accumulated.isBlank()) {
-            throw IllegalStateException("AI Teacher returned an empty response.")
-        }
+        return openWeightClient.streamChatCompletion(
+            provider = activeProvider,
+            modelId = activeModelId,
+            systemInstruction = gurujiSystemPrompt,
+            userPrompt = prompt
+        )
     }
 
     suspend fun evaluateAnswerPresentation(
@@ -201,9 +123,12 @@ class AiTeacherRepository {
         """.trimIndent()
 
         return withTimeout(60_000L) {
-            val response = tutorModel.generateContent(prompt)
-            response.text?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("Empty evaluation response from AI.")
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         }
     }
 
@@ -218,13 +143,31 @@ class AiTeacherRepository {
             Chapter ${ch.chapterNumber}: ${ch.titleEn} (${ch.titleKn}).
             Marks per question: $marks.
             Match KSEAB 2026-27 board standard. Do NOT claim any historical exam year.
+            
+            Return ONLY valid JSON matching this exact structure (no markdown prose):
+            {
+              "questions": [
+                {
+                  "questionEn": "...",
+                  "questionKn": "...",
+                  "marks": $marks,
+                  "officialAnswer": "...",
+                  "markingPoints": ["Step 1 ...", "Step 2 ...", "Step 3 ..."],
+                  "commonMistakes": "..."
+                }
+              ]
+            }
         """.trimIndent()
 
-        val response = withTimeout(60_000L) {
-            generatorModel.generateContent(prompt)
+        val rawText = withTimeout(60_000L) {
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
+                userPrompt = prompt
+            )
         }
-        val rawJson = response.text ?: throw IllegalStateException("Empty JSON from AI generator.")
-        val root = JSONObject(rawJson)
+        val root = OpenWeightAiClient.extractJsonObject(rawText)
         val array = root.getJSONArray("questions")
         val format = when (marks) {
             1 -> QuestionFormat.VSA_1M
@@ -234,12 +177,16 @@ class AiTeacherRepository {
         }
         return (0 until array.length()).map { idx ->
             val obj = array.getJSONObject(idx)
-            val stepsArr = obj.getJSONArray("markingPoints")
-            val steps = (0 until stepsArr.length()).map { stepsArr.getString(it) }
+            val stepsArr = obj.optJSONArray("markingPoints")
+            val steps = if (stepsArr != null) {
+                (0 until stepsArr.length()).map { stepsArr.getString(it) }
+            } else {
+                listOf("Given data & formula (0.5M)", "Step-by-step substitution & answer (${marks - 0.5}M)")
+            }
             PyqQuestion(
                 id = "ai_${chapterNumber}_${System.currentTimeMillis()}_$idx",
-                yearLabel = "AI Practice",
-                examNumber = "AI-GENERATED",
+                yearLabel = "Open-Weight AI Practice",
+                examNumber = "OPEN-AI",
                 chapterNumber = chapterNumber,
                 topic = ch.titleEn,
                 marks = obj.optInt("marks", marks).coerceIn(1, 5),
@@ -283,9 +230,12 @@ class AiTeacherRepository {
         """.trimIndent()
 
         return withTimeout(60_000L) {
-            val response = tutorModel.generateContent(prompt)
-            response.text?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("AI returned empty detailed notes.")
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         }
     }
 
@@ -296,6 +246,7 @@ class AiTeacherRepository {
         val ch = KsmkeSyllabusRepository.getChapter(chapterNumber)
         val chapterPyqs = KsmkeSyllabusRepository.pyqQuestions
             .filter { it.chapterNumber == chapterNumber }
+            .take(8)
             .joinToString("\n") { "- [${it.yearLabel}, ${it.marks}M, ${it.topic}]: ${it.questionEn}" }
 
         val prompt = """
@@ -303,25 +254,48 @@ class AiTeacherRepository {
             Invent a BRAND-NEW, original 7-question chapterwise targeted question paper for:
             Chapter ${ch.chapterNumber}: ${ch.titleEn} (${ch.titleKn}).
             
-            Reference historical PYQs for probability & topic weighting (DO NOT copy verbatim and DO NOT claim any fake historical exam year; mark every question as AI-targeted practice based on past frequency):
+            Reference historical PYQs for probability & topic weighting (DO NOT copy verbatim and DO NOT claim any fake historical exam year):
             $chapterPyqs
             
-            Required Structure (Total ~16–20 Marks):
+            Required Structure (Total ~16-20 Marks):
             - 2 questions in "Section I • Multiple Choice (1 Mark Each)" (marks=1, 4 distinct mcqOptions, correctMcqIndex 0..3)
             - 1 question in "Section II • Very Short Answer (1 Mark)" (marks=1, mcqOptions=[], correctMcqIndex=-1)
             - 2 questions in "Section III • Short Answer (2 Marks)" (marks=2, mcqOptions=[], correctMcqIndex=-1)
             - 1 question in "Section IV • Detailed Problem Solving (3 Marks)" (marks=3, mcqOptions=[], correctMcqIndex=-1)
             - 1 question in "Section V • Long Answer / Proof / Application (4 Marks)" (marks=4, mcqOptions=[], correctMcqIndex=-1)
             
-            Ensure every numerical answer is 100% mathematically verified and every step in stepByStepSolution has clear KSEAB mark splits.
             Preferred explanation language: ${language.label}. Use Unicode math symbols, no LaTeX dollars.
+            Return ONLY valid JSON matching:
+            {
+              "paperTitle": "...",
+              "pyqBlueprintSummary": "...",
+              "questions": [
+                {
+                  "sectionLabel": "...",
+                  "marks": 1,
+                  "probabilityBadge": "88% High-Yield Pattern",
+                  "pyqTargetNote": "...",
+                  "questionEn": "...",
+                  "questionKn": "...",
+                  "mcqOptions": ["A", "B", "C", "D"],
+                  "correctMcqIndex": 0,
+                  "officialAnswer": "...",
+                  "stepByStepSolution": ["Step 1 ...", "Step 2 ..."],
+                  "commonMistake": "..."
+                }
+              ]
+            }
         """.trimIndent()
 
-        val response = withTimeout(60_000L) {
-            chapterPaperModel.generateContent(prompt)
+        val rawText = withTimeout(60_000L) {
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = "You are a Karnataka SSLC Maths paper setter. Output strictly valid JSON only.",
+                userPrompt = prompt
+            )
         }
-        val rawJson = response.text ?: throw IllegalStateException("Empty JSON for AI chapter paper.")
-        val root = JSONObject(rawJson)
+        val root = OpenWeightAiClient.extractJsonObject(rawText)
         val qArr = root.getJSONArray("questions")
         val questions = (0 until qArr.length()).map { idx ->
             val obj = qArr.getJSONObject(idx)
@@ -358,7 +332,7 @@ class AiTeacherRepository {
             durationMinutes = (totalMarks * 2.2).toInt().coerceIn(25, 60),
             pyqBlueprintSummary = root.optString(
                 "pyqBlueprintSummary",
-                "AI-invented practice paper weighted by historical KSEAB frequency patterns."
+                "Open-weight AI practice paper weighted by historical KSEAB frequency patterns."
             ),
             generatedByAi = true,
             questions = questions
@@ -418,9 +392,12 @@ class AiTeacherRepository {
         }
 
         return withTimeout(60_000L) {
-            val response = tutorModel.generateContent(prompt)
-            response.text?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("AI returned empty Q&A check response.")
+            openWeightClient.completeChat(
+                provider = activeProvider,
+                modelId = activeModelId,
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         }
     }
 
@@ -464,12 +441,14 @@ class AiTeacherRepository {
             } else {
                 appendLine(
                     """
-                    TASK: Analyze the student's scanned handwritten solution carefully!
-                    1. Transcribe the question & each step written by the student.
-                    2. Check EVERY step mathematically: praise what is correct first.
-                    3. If ANY step, sign, formula, or unit is wrong, pinpoint the exact line where it went wrong and explain WHY gently.
-                    4. Show the corrected complete step-by-step board presentation and final verified answer.
-                    5. If the image is unclear/blurry, tell the student politely what could not be read cleanly.
+                    TASK: Act as a precise Handwriting Mathematics Reader for the student's scanned notebook solution.
+                    Follow this exact structured output:
+                    1. Transcribed Steps: List each handwritten line as "Step 1: ...", "Step 2: ...", etc.
+                    2. First Incorrect Step: Explicitly write either "First Incorrect Step: Step X — <exact issue>" or "First Incorrect Step: None (All steps are mathematically valid)".
+                    3. Gentle Correction: First praise what is right in earlier steps, then clearly explain how to fix Step X (sign, formula, substitution, or missing unit).
+                    4. Corrected KSEAB Presentation: Show the clean line-by-line board solution and verified final answer.
+                    5. Underlying Concept: Name the exact single concept (e.g., "Discriminant Δ = b² - 4ac" or "Section Formula").
+                    6. If any part of the photo is blurry or cut off, politely specify which line could not be read clearly.
                     """.trimIndent()
                 )
             }
@@ -477,20 +456,18 @@ class AiTeacherRepository {
         }
 
         return withTimeout(60_000L) {
-            val response = tutorModel.generateContent(
-                content {
-                    image(bitmap)
-                    text(promptText)
-                }
+            openWeightClient.analyzeImageWithVisionModel(
+                provider = activeProvider,
+                bitmap = bitmap,
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = promptText
             )
-            response.text?.takeIf { it.isNotBlank() }
-                ?: throw IllegalStateException("AI returned empty image analysis.")
         }
     }
 
     /**
      * Deterministic offline teaching fallback using KSMKE + MathVerificationEngine
-     * when the student is studying offline without network connectivity.
+     * when studying offline or without an API key.
      */
     fun buildOfflineKsmkeResponse(
         studentMessage: String,
@@ -528,12 +505,12 @@ class AiTeacherRepository {
         if (error is CancellationException && error !is TimeoutCancellationException) {
             throw error
         }
-        Log.e(TAG, "AI Teacher error", error)
+        Log.e(TAG, "Open-weight AI error", error)
         return when (error) {
             is TimeoutCancellationException ->
-                "AI Teacher timed out after 60 seconds. Check your internet or tap 'Use Offline KSMKE Guide'."
+                "Open-weight AI model timed out after 60 seconds. Try switching provider/model or tap 'Use Offline KSMKE Guide'."
             else ->
-                error.localizedMessage ?: "Unable to reach Firebase AI Logic right now."
+                error.localizedMessage ?: "Unable to reach open-weight OpenAI-compatible provider right now."
         }
     }
 }

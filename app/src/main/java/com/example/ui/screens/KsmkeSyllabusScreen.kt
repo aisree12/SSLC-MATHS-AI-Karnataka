@@ -21,10 +21,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -33,6 +36,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -52,12 +56,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.ksmke.AiTeachingLibrary
 import com.example.data.ksmke.KsmkeSyllabusRepository
+import com.example.data.ksmke.OfficialSourceLibrary
 import com.example.domain.KsmkeChapter
 import com.example.domain.MasteryStatus
+import com.example.domain.TopicCompletionStatus
 import com.example.domain.TopicDetailedNote
 import com.example.ui.CloudUiState
 import com.example.ui.SslcStudyViewModel
+import com.example.ui.components.InteractiveMathBlackboardCard
 import com.example.ui.components.PdfSavedBanner
 import com.example.ui.theme.EmeraldChalk
 import com.example.ui.theme.IndigoInk
@@ -78,9 +86,15 @@ fun KsmkeSyllabusScreen(
     val syncMessage by viewModel.syncMessage.collectAsStateWithLifecycle()
     val aiChapterNotes by viewModel.aiChapterNotes.collectAsStateWithLifecycle()
     val pdfExportState by viewModel.pdfExportState.collectAsStateWithLifecycle()
+    val topicVerifications by viewModel.topicVerifications.collectAsStateWithLifecycle()
 
     var expandedChapter by rememberSaveable { mutableIntStateOf(10) }
     var showMathLab by rememberSaveable { mutableStateOf(false) }
+    var showBlackboard by rememberSaveable { mutableStateOf(false) }
+    var showDualLibrary by rememberSaveable { mutableStateOf(false) }
+
+    val totalTopicsCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
+    val verifiedTopicsCount = topicVerifications.values.count { it == TopicCompletionStatus.VERIFIED_COMPLETE }
 
     val masteryMap: Map<Int, MasteryStatus> = when (val state = cloudState) {
         is CloudUiState.Success -> {
@@ -110,22 +124,71 @@ fun KsmkeSyllabusScreen(
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "KSMKE • 6-Layer Knowledge Engine",
                         style = MaterialTheme.typography.titleLarge,
-                        color = androidx.compose.ui.graphics.Color.White
+                        color = Color.White
                     )
                     Text(
-                        text = "Complete 15 Karnataka SSLC Class 10 Chapters • Formulas, Theorems, Solved Steps, Marking Points & Math Verifier.",
+                        text = "Page-Verified KTBS Textbook (EN/KN), DIKSHA Modules, Interactive Blackboard & Math Verification Engine.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = androidx.compose.ui.graphics.Color(0xFFE2E8F0)
+                        color = Color(0xFFE2E8F0)
                     )
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Textbook Page Verification: $verifiedTopicsCount / $totalTopicsCount Topics Verified",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = SaffronGold
+                        )
+                        LinearProgressIndicator(
+                            progress = {
+                                if (totalTopicsCount > 0) (verifiedTopicsCount.toFloat() / totalTopicsCount.toFloat()).coerceIn(0f, 1f)
+                                else 0f
+                            },
+                            color = SaffronGold,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier
+                            .padding(top = 4.dp)
+                            .horizontalScroll(rememberScrollState())
                     ) {
+                        OutlinedButton(
+                            onClick = { showBlackboard = !showBlackboard },
+                            modifier = Modifier.testTag("toggle_blackboard_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Draw,
+                                contentDescription = null,
+                                tint = SaffronGold,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.size(6.dp))
+                            Text(
+                                text = if (showBlackboard) "Hide Blackboard" else "Math Blackboard",
+                                color = Color.White
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { showDualLibrary = !showDualLibrary },
+                            modifier = Modifier.testTag("toggle_dual_library_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.LibraryBooks,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.size(6.dp))
+                            Text(
+                                text = if (showDualLibrary) "Hide Source/AI Libraries" else "Official vs AI Libraries",
+                                color = Color.White
+                            )
+                        }
                         OutlinedButton(
                             onClick = { showMathLab = !showMathLab },
                             modifier = Modifier.testTag("toggle_math_lab_button")
@@ -133,13 +196,13 @@ fun KsmkeSyllabusScreen(
                             Icon(
                                 imageVector = Icons.Filled.Calculate,
                                 contentDescription = null,
-                                tint = androidx.compose.ui.graphics.Color.White,
+                                tint = Color.White,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(
-                                text = if (showMathLab) "Hide Math Engine Lab" else "Open Math Verification Lab",
-                                color = androidx.compose.ui.graphics.Color.White
+                                text = if (showMathLab) "Hide Verifier" else "Math Verifier",
+                                color = Color.White
                             )
                         }
                     }
@@ -175,6 +238,18 @@ fun KsmkeSyllabusScreen(
             }
         }
 
+        if (showBlackboard) {
+            item {
+                InteractiveMathBlackboardCard()
+            }
+        }
+
+        if (showDualLibrary) {
+            item {
+                DualLibraryArchitectureCard()
+            }
+        }
+
         if (showMathLab) {
             item {
                 MathVerificationLabCard(
@@ -189,10 +264,14 @@ fun KsmkeSyllabusScreen(
             ChapterCard(
                 chapter = chapter,
                 mastery = currentMastery,
+                topicVerifications = topicVerifications,
                 expanded = expandedChapter == chapter.chapterNumber,
                 aiNotesState = aiChapterNotes[chapter.chapterNumber],
                 onToggleExpand = {
                     expandedChapter = if (expandedChapter == chapter.chapterNumber) -1 else chapter.chapterNumber
+                },
+                onUpdateTopicVerification = { topicNum, status ->
+                    viewModel.setTopicVerificationStatus(topicNum, chapter.chapterNumber, status)
                 },
                 onUpdateMastery = { status ->
                     val acc = when (status) {
@@ -219,12 +298,101 @@ fun KsmkeSyllabusScreen(
 }
 
 @Composable
+private fun DualLibraryArchitectureCard() {
+    var selectedLib by rememberSaveable { mutableIntStateOf(0) } // 0 = Official Source Library, 1 = AI Teaching Library
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("dual_library_card")
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = "Dual-Library Knowledge Architecture",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Text(
+                text = "Official source provenance is strictly isolated from AI teaching explanations and generated practice.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = selectedLib == 0,
+                    onClick = { selectedLib = 0 },
+                    label = { Text("1. Official Source Library") }
+                )
+                FilterChip(
+                    selected = selectedLib == 1,
+                    onClick = { selectedLib = 1 },
+                    label = { Text("2. AI Teaching Library") }
+                )
+            }
+            if (selectedLib == 0) {
+                OfficialSourceLibrary.officialDocuments.forEach { doc ->
+                    Surface(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Text(
+                                text = "${doc.sourceType.label} • ${doc.verificationState}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = EmeraldChalk
+                            )
+                            Text(text = doc.title, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                text = "${doc.editionOrYear} • Medium: ${doc.languageMedium}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(text = doc.provenanceAndPermissionNote, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            } else {
+                AiTeachingLibrary.sixLayerEngine.forEach { layer ->
+                    Surface(
+                        color = IndigoInk.copy(alpha = 0.06f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "Layer ${layer.layerNumber}: ${layer.name}",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = IndigoInk
+                            )
+                            Text(text = layer.teachingRole, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ChapterCard(
     chapter: KsmkeChapter,
     mastery: MasteryStatus,
+    topicVerifications: Map<String, TopicCompletionStatus>,
     expanded: Boolean,
     aiNotesState: CloudUiState<String>?,
     onToggleExpand: () -> Unit,
+    onUpdateTopicVerification: (String, TopicCompletionStatus) -> Unit,
     onUpdateMastery: (MasteryStatus) -> Unit,
     onDownloadNotesPdf: () -> Unit,
     onExpandAiNotes: () -> Unit,
@@ -392,13 +560,23 @@ private fun ChapterCard(
                     }
 
                     if (chapter.detailedTopics.isNotEmpty()) {
+                        val verifiedInCh = chapter.detailedTopics.count {
+                            topicVerifications[it.topicNumber] == TopicCompletionStatus.VERIFIED_COMPLETE
+                        }
                         Text(
-                            text = "Topic-Wise Detailed Notes (${chapter.detailedTopics.size} Topics • Complete Steps)",
+                            text = "Page-by-Page Textbook Topics ($verifiedInCh/${chapter.detailedTopics.size} Verified)",
                             style = MaterialTheme.typography.titleSmall,
                             color = IndigoInk
                         )
                         chapter.detailedTopics.forEach { topic ->
-                            TopicDetailedNoteBlock(topic = topic)
+                            val status = topicVerifications[topic.topicNumber] ?: TopicCompletionStatus.NOT_VERIFIED
+                            TopicDetailedNoteBlock(
+                                topic = topic,
+                                verificationStatus = status,
+                                onUpdateVerification = { nextStatus ->
+                                    onUpdateTopicVerification(topic.topicNumber, nextStatus)
+                                }
+                            )
                         }
                     }
 
@@ -511,8 +689,17 @@ private fun ChapterCard(
 }
 
 @Composable
-private fun TopicDetailedNoteBlock(topic: TopicDetailedNote) {
+private fun TopicDetailedNoteBlock(
+    topic: TopicDetailedNote,
+    verificationStatus: TopicCompletionStatus,
+    onUpdateVerification: (TopicCompletionStatus) -> Unit
+) {
     var topicExpanded by rememberSaveable(topic.topicNumber) { mutableStateOf(false) }
+    val statusColor = when (verificationStatus) {
+        TopicCompletionStatus.VERIFIED_COMPLETE -> EmeraldChalk
+        TopicCompletionStatus.IN_REVIEW -> SaffronGold
+        TopicCompletionStatus.NOT_VERIFIED -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
@@ -528,16 +715,36 @@ private fun TopicDetailedNoteBlock(topic: TopicDetailedNote) {
                     .clickable { topicExpanded = !topicExpanded }
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Topic ${topic.topicNumber}: ${topic.topicTitleEn}",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = IndigoInk
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        if (verificationStatus == TopicCompletionStatus.VERIFIED_COMPLETE) {
+                            Icon(
+                                imageVector = Icons.Filled.Verified,
+                                contentDescription = "Verified topic",
+                                tint = EmeraldChalk,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Text(
+                            text = "Topic ${topic.topicNumber}: ${topic.topicTitleEn}",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = IndigoInk
+                        )
+                    }
                     Text(
                         text = topic.topicTitleKn,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (topic.sourcePageRef.isNotBlank()) {
+                        Text(
+                            text = "${topic.sourcePageRef} • ${topic.exerciseRef} • ${verificationStatus.label}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = statusColor
+                        )
+                    }
                 }
                 Icon(
                     imageVector = if (topicExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -551,6 +758,26 @@ private fun TopicDetailedNoteBlock(topic: TopicDetailedNote) {
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     HorizontalDivider()
+                    if (topic.dikshaModuleTitle.isNotBlank()) {
+                        Text(
+                            text = "Source Reference: ${topic.sourcePageRef} | ${topic.exerciseRef}\nDigital Resource: ${topic.dikshaModuleTitle}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = IndigoInk
+                        )
+                    }
+                    Text("Textbook Verification Status:", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
+                        TopicCompletionStatus.entries.forEach { st ->
+                            FilterChip(
+                                selected = verificationStatus == st,
+                                onClick = { onUpdateVerification(st) },
+                                label = { Text(st.label) }
+                            )
+                        }
+                    }
                     Text("Core Concepts & Definitions:", style = MaterialTheme.typography.labelLarge)
                     topic.coreConcepts.forEach { c ->
                         Text("• $c", style = MaterialTheme.typography.bodySmall)

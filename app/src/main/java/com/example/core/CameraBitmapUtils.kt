@@ -25,7 +25,7 @@ object CameraBitmapUtils {
 
     /**
      * Decodes, auto-rotates via EXIF, and downscales a captured or picked image
-     * to maxDim <= 1280px so Gemini multimodal payloads stay crisp and well under 20MB.
+     * to maxDim <= 1280px so open-weight vision payloads stay crisp and fast.
      */
     fun decodeAndScaleBitmap(
         context: Context,

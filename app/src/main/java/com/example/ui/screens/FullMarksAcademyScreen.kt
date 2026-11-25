@@ -58,7 +58,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.domain.ExamMode
+import com.example.domain.ExaminerEvaluationReport
 import com.example.domain.MathVerificationEngine
+import com.example.domain.PyqQuestion
 import com.example.ui.CloudUiState
 import com.example.ui.ExamSessionUiState
 import com.example.ui.SslcStudyViewModel
@@ -76,6 +78,7 @@ fun FullMarksAcademyScreen(
 ) {
     val examState by viewModel.examState.collectAsStateWithLifecycle()
     val answerEvalState by viewModel.answerEvalState.collectAsStateWithLifecycle()
+    val examinerReport by viewModel.examinerReport.collectAsStateWithLifecycle()
 
     var selectedTab by rememberSaveable { mutableIntStateOf(0) } // 0 = Exam Simulator, 1 = Answer Writing Coach
 
@@ -217,8 +220,9 @@ fun FullMarksAcademyScreen(
             item {
                 AnswerWritingCoachCard(
                     evalState = answerEvalState,
-                    onEvaluate = { qText, expected, marks, steps ->
-                        viewModel.evaluateStudentAnswer(qText, expected, marks, steps)
+                    examinerReport = examinerReport,
+                    onEvaluate = { question, steps ->
+                        viewModel.evaluateStudentAnswer(question, steps)
                     }
                 )
             }
@@ -508,9 +512,10 @@ private fun ActiveExamSimulatorView(
 @Composable
 private fun AnswerWritingCoachCard(
     evalState: CloudUiState<String>?,
-    onEvaluate: (String, String, Int, String) -> Unit
+    examinerReport: ExaminerEvaluationReport?,
+    onEvaluate: (PyqQuestion, String) -> Unit
 ) {
-    val sampleQuestions = KsmkeSyllabusRepository.pyqQuestions.filter { it.marks in 2..3 }
+    val sampleQuestions = KsmkeSyllabusRepository.pyqQuestions.filter { it.marks in 2..4 }
     var selectedIdx by rememberSaveable { mutableIntStateOf(0) }
     val activeQ = sampleQuestions[selectedIdx % sampleQuestions.size]
     var studentSteps by rememberSaveable {
@@ -529,11 +534,11 @@ private fun AnswerWritingCoachCard(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "5-Step Board Answer-Writing Trainer",
+                text = "Real Examiner Simulation & 5-Step Trainer",
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Examiners award marks for: 1) Given  2) Formula  3) Substitution  4) Step Calculation  5) Highlighted Answer + Units.",
+                text = "Evaluated by the Independent Marking Engine on KSEAB points: Given, Formula, Substitution, Steps, Final Answer & Units.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -542,7 +547,7 @@ private fun AnswerWritingCoachCard(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.horizontalScroll(rememberScrollState())
             ) {
-                sampleQuestions.take(5).forEachIndexed { idx, q ->
+                sampleQuestions.take(6).forEachIndexed { idx, q ->
                     FilterChip(
                         selected = selectedIdx == idx,
                         onClick = { selectedIdx = idx },
@@ -556,11 +561,20 @@ private fun AnswerWritingCoachCard(
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = activeQ.questionEn,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(12.dp)
-                )
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = activeQ.questionEn,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "Target Concept: ${activeQ.conceptTag.ifBlank { activeQ.topic }} • Official Key: ${activeQ.officialAnswer}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = IndigoInk
+                    )
+                }
             }
 
             OutlinedTextField(
@@ -574,14 +588,7 @@ private fun AnswerWritingCoachCard(
             )
 
             Button(
-                onClick = {
-                    onEvaluate(
-                        activeQ.questionEn,
-                        activeQ.officialAnswer,
-                        activeQ.marks,
-                        studentSteps
-                    )
-                },
+                onClick = { onEvaluate(activeQ, studentSteps) },
                 enabled = evalState !is CloudUiState.Loading,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
@@ -597,7 +604,63 @@ private fun AnswerWritingCoachCard(
                 } else {
                     Icon(Icons.Filled.CheckCircle, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.size(8.dp))
-                    Text("Check Marking Points with AI Examiner")
+                    Text("Simulate Real Board Examiner Marking")
+                }
+            }
+
+            examinerReport?.let { report ->
+                Surface(
+                    color = IndigoInk.copy(alpha = 0.06f),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("examiner_report_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = report.summaryFeedback,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = IndigoInk
+                        )
+                        HorizontalDivider()
+                        report.stepChecks.forEach { check ->
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(text = check.stepLabel, style = MaterialTheme.typography.labelLarge)
+                                    Text(
+                                        text = check.feedback,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = "${MathVerificationEngine.fmt(check.marksAwarded)}/${MathVerificationEngine.fmt(check.marksAvailable)}M",
+                                    style = MathMonoTextStyle,
+                                    color = if (check.marksAwarded >= check.marksAvailable) EmeraldChalk else SaffronGold
+                                )
+                            }
+                        }
+                        if (report.missingSteps.isNotEmpty()) {
+                            Text(
+                                text = "Marks Lost On: ${report.missingSteps.joinToString(" | ")}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                        report.detectedWeakConcept?.let { weak ->
+                            Text(
+                                text = "Logged Concept for Practice: $weak",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = SaffronGold
+                            )
+                        }
+                    }
                 }
             }
 

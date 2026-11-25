@@ -19,16 +19,19 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,11 +52,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.core.signOut
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.domain.MasteryStatus
+import com.example.domain.TopicCompletionStatus
+import com.example.domain.WeaknessAndPlannerEngine
 import com.example.ui.CloudUiState
 import com.example.ui.SslcStudyViewModel
 import com.example.ui.theme.EmeraldChalk
 import com.example.ui.theme.IndigoInk
 import com.example.ui.theme.SaffronGold
+import kotlin.math.roundToInt
 
 @Composable
 fun CoachProfileScreen(
@@ -70,6 +76,10 @@ fun CoachProfileScreen(
     val localGoals by viewModel.localGoals.collectAsStateWithLifecycle()
     val localExams by viewModel.localExamHistory.collectAsStateWithLifecycle()
     val localMastery by viewModel.localChapterProgress.collectAsStateWithLifecycle()
+    val conceptWeaknesses by viewModel.conceptWeaknesses.collectAsStateWithLifecycle()
+    val daysUntilExam by viewModel.daysUntilExam.collectAsStateWithLifecycle()
+    val dailyStudyMinutes by viewModel.dailyStudyMinutes.collectAsStateWithLifecycle()
+    val topicVerifications by viewModel.topicVerifications.collectAsStateWithLifecycle()
 
     var newGoalTitle by rememberSaveable { mutableStateOf("") }
     var calmTipIndex by rememberSaveable { mutableStateOf(0) }
@@ -85,7 +95,6 @@ fun CoachProfileScreen(
     val targetScore = profile?.targetScore?.toInt() ?: 90
     val streakDays = profile?.streakDays?.toInt() ?: 1
 
-    // Personalized study timetable: prioritize NEEDS_FOUNDATION and NOT_STARTED high-weight chapters
     val masteryByCh = (cloudState as? CloudUiState.Success)?.data?.masteryByChapter
         ?.mapValues { it.value.safeStatus() }
         ?: localMastery.associate {
@@ -93,18 +102,21 @@ fun CoachProfileScreen(
                 ?: MasteryStatus.NOT_STARTED)
         }
 
-    val timetableChapters = KsmkeSyllabusRepository.chapters
-        .sortedWith(
-            compareBy<com.example.domain.KsmkeChapter> {
-                when (masteryByCh[it.chapterNumber] ?: MasteryStatus.NOT_STARTED) {
-                    MasteryStatus.NEEDS_FOUNDATION -> 0
-                    MasteryStatus.NOT_STARTED -> 1
-                    MasteryStatus.PARTIALLY_UNDERSTOOD -> 2
-                    MasteryStatus.UNDERSTOOD -> 3
-                }
-            }.thenByDescending { it.boardMarksWeightage }
-        )
-        .take(5)
+    val totalTopicsCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
+    val verifiedTopicsCount = topicVerifications.values.count { it == TopicCompletionStatus.VERIFIED_COMPLETE }
+    val overallConfidence = WeaknessAndPlannerEngine.computeOverallConfidence(
+        readinessScore = readiness,
+        weaknesses = conceptWeaknesses,
+        verifiedTopicsCount = verifiedTopicsCount,
+        totalTopicsCount = totalTopicsCount
+    )
+    val automaticPlan = WeaknessAndPlannerEngine.buildAutomaticStudyPlan(
+        daysUntilExam = daysUntilExam,
+        dailyStudyMinutes = dailyStudyMinutes,
+        masteryByChapter = masteryByCh,
+        chapterProgressList = localMastery,
+        weaknesses = conceptWeaknesses
+    )
 
     LazyColumn(
         contentPadding = PaddingValues(14.dp),
@@ -133,7 +145,7 @@ fun CoachProfileScreen(
                                 color = Color.White
                             )
                             Text(
-                                text = "Readiness: $readiness% • Goal: $targetScore/100 • Streak: $streakDays day(s)",
+                                text = "Readiness: $readiness% • Confidence: $overallConfidence% • Goal: $targetScore/100",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFFE2E8F0)
                             )
@@ -155,12 +167,12 @@ fun CoachProfileScreen(
                         }
                     }
                     LinearProgressIndicator(
-                        progress = { (readiness / 100f).coerceIn(0f, 1f) },
+                        progress = { (overallConfidence / 100f).coerceIn(0f, 1f) },
                         color = SaffronGold,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Text(
-                        text = "Realistic Readiness Meter — builds steadily with verified chapter accuracy and timed tests.",
+                        text = "Personalised Learning-Confidence Index ($overallConfidence%) • Verified $verifiedTopicsCount/$totalTopicsCount topics • Streak: $streakDays day(s).",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFCBD5E1)
                     )
@@ -223,12 +235,78 @@ fun CoachProfileScreen(
             }
         }
 
-        // Personalized Study Timetable
+        // Intelligent Concept Weakness Detection & Confidence Tracker
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 shape = RoundedCornerShape(18.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("concept_weakness_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.TrackChanges, contentDescription = null, tint = SaffronGold)
+                        Text("Intelligent Concept Weakness & Confidence", style = MaterialTheme.typography.titleMedium)
+                    }
+                    if (conceptWeaknesses.isEmpty()) {
+                        Text(
+                            text = "Solve questions in Answer-Writing Coach or Exam Simulator to detect exact concept errors (instead of blaming a whole chapter).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        conceptWeaknesses.take(4).forEachIndexed { idx, w ->
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "Ch ${w.chapterNumber} • ${w.conceptTag}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = "${w.accuracyPercent}% acc • ${w.errors}/${w.attempts} errors",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (w.accuracyPercent < 70) MaterialTheme.colorScheme.error else EmeraldChalk
+                                    )
+                                }
+                                Text(
+                                    text = w.recommendation,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    listOf(1 to "Low", 3 to "Okay", 5 to "Confident").forEach { (r, label) ->
+                                        FilterChip(
+                                            selected = false,
+                                            onClick = { viewModel.setConceptConfidenceRating(w.conceptTag, w.chapterNumber, r) },
+                                            label = { Text(label) }
+                                        )
+                                    }
+                                }
+                            }
+                            if (idx < conceptWeaknesses.take(4).lastIndex) HorizontalDivider()
+                        }
+                    }
+                }
+            }
+        }
+
+        // Automatic Exam-Countdown Study Planner
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                shape = RoundedCornerShape(18.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("automatic_study_planner_card")
             ) {
                 Column(
                     modifier = Modifier.padding(16.dp),
@@ -236,21 +314,28 @@ fun CoachProfileScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Filled.Schedule, contentDescription = null, tint = IndigoInk)
-                        Text("Personalised Weekly Priority Plan", style = MaterialTheme.typography.titleMedium)
+                        Text("Automatic Exam-Countdown Planner", style = MaterialTheme.typography.titleMedium)
                     }
                     Text(
-                        text = "Automatically allocates extra practice time to chapters that need foundation while keeping mastered chapters light.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Days before SSLC Maths Board: $daysUntilExam days",
+                        style = MaterialTheme.typography.labelMedium
                     )
-                    timetableChapters.forEachIndexed { idx, ch ->
-                        val st = masteryByCh[ch.chapterNumber] ?: MasteryStatus.NOT_STARTED
-                        val slotMinutes = when (st) {
-                            MasteryStatus.NEEDS_FOUNDATION -> 40
-                            MasteryStatus.NOT_STARTED -> 30
-                            MasteryStatus.PARTIALLY_UNDERSTOOD -> 20
-                            MasteryStatus.UNDERSTOOD -> 10
-                        }
+                    Slider(
+                        value = daysUntilExam.toFloat(),
+                        onValueChange = { viewModel.updateStudyPlannerConfig(it.roundToInt(), dailyStudyMinutes) },
+                        valueRange = 5f..180f
+                    )
+                    Text(
+                        text = "Daily Study Budget: $dailyStudyMinutes min/day",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    Slider(
+                        value = dailyStudyMinutes.toFloat(),
+                        onValueChange = { viewModel.updateStudyPlannerConfig(daysUntilExam, (it / 10f).roundToInt() * 10) },
+                        valueRange = 30f..240f
+                    )
+                    HorizontalDivider()
+                    automaticPlan.forEachIndexed { idx, slot ->
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
@@ -258,11 +343,11 @@ fun CoachProfileScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Slot ${idx + 1}: Ch ${ch.chapterNumber} • ${ch.titleEn}",
+                                    text = "${idx + 1}. Ch ${slot.chapterNumber} • ${slot.chapterTitle} (${slot.focusType})",
                                     style = MaterialTheme.typography.titleSmall
                                 )
                                 Text(
-                                    text = "${st.label} • Weightage ${ch.boardMarksWeightage}M",
+                                    text = "Concept: ${slot.targetConcept}\n${slot.rationale}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -272,14 +357,14 @@ fun CoachProfileScreen(
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text(
-                                    text = "$slotMinutes min",
+                                    text = "${slot.dailyMinutes}m/d",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = SaffronGold,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
-                        if (idx < timetableChapters.lastIndex) HorizontalDivider()
+                        if (idx < automaticPlan.lastIndex) HorizontalDivider()
                     }
                 }
             }

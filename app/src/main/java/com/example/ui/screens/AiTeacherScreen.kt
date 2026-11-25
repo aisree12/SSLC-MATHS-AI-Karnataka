@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -21,10 +25,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
@@ -41,6 +48,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,11 +58,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.core.VoiceTeacherHelper
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.domain.ChatTurn
+import com.example.domain.OpenWeightModelCatalog
+import com.example.domain.OpenWeightProvider
 import com.example.domain.TeachingLanguage
 import com.example.ui.SslcStudyViewModel
 import com.example.ui.components.CameraSolutionScannerSheet
@@ -74,10 +87,44 @@ fun AiTeacherScreen(
     val isBusy by viewModel.isAiBusy.collectAsStateWithLifecycle()
     val aiError by viewModel.aiError.collectAsStateWithLifecycle()
     val cameraScanState by viewModel.cameraScanState.collectAsStateWithLifecycle()
+    val selectedProvider by viewModel.selectedProvider.collectAsStateWithLifecycle()
+    val selectedModelId by viewModel.selectedModelId.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
     var input by rememberSaveable { mutableStateOf("") }
     var showScannerSheet by remember { mutableStateOf(false) }
+    var isListening by remember { mutableStateOf(false) }
+    var isSpeaking by remember { mutableStateOf(false) }
+    var voiceStatus by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
+
+    val voiceHelper = remember(context) {
+        VoiceTeacherHelper(
+            context = context,
+            onListeningChanged = { isListening = it },
+            onSpeechResult = { spoken ->
+                voiceStatus = null
+                input = spoken
+            },
+            onVoiceStatus = { msg -> voiceStatus = msg },
+            onSpeakingChanged = { isSpeaking = it }
+        )
+    }
+
+    DisposableEffect(voiceHelper) {
+        onDispose { voiceHelper.release() }
+    }
+
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            voiceStatus = "Listening in ${if (language == TeachingLanguage.KN) "Kannada" else "English"}..."
+            voiceHelper.startListening(language)
+        } else {
+            voiceStatus = "Microphone permission denied. You can still type your question or scan a notebook page."
+        }
+    }
 
     if (showScannerSheet) {
         CameraSolutionScannerSheet(
@@ -192,6 +239,39 @@ fun AiTeacherScreen(
                         )
                     }
                 }
+
+                // Free Open-Weight OpenAI-Compatible Provider & Model Picker (Qwen, DeepSeek, Llama, Mistral, Ollama)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    OpenWeightProvider.entries.forEach { provider ->
+                        FilterChip(
+                            selected = selectedProvider == provider,
+                            onClick = { viewModel.selectOpenWeightProvider(provider) },
+                            label = { Text(provider.displayName) }
+                        )
+                    }
+                }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    OpenWeightModelCatalog.modelsFor(selectedProvider).forEach { model ->
+                        FilterChip(
+                            selected = selectedModelId == model.id,
+                            onClick = { viewModel.selectOpenWeightModel(model.id) },
+                            label = { Text(model.label) }
+                        )
+                    }
+                }
+                if (selectedProvider.requiresApiKey && !viewModel.isOpenAiKeyConfigured) {
+                    Text(
+                        text = "Tip: Add a free ${selectedProvider.displayName} key to OPENAI_COMPAT_API_KEY in AI Studio Secrets, or switch to Local Ollama / Offline Mode.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SaffronGold
+                    )
+                }
             }
         }
 
@@ -235,7 +315,32 @@ fun AiTeacherScreen(
                 .fillMaxWidth()
         ) {
             items(chatTurns, key = { it.id }) { turn ->
-                ChatBubble(turn = turn)
+                ChatBubble(
+                    turn = turn,
+                    isSpeaking = isSpeaking,
+                    onSpeakToggle = { textToSpeak ->
+                        voiceStatus = null
+                        if (isSpeaking) voiceHelper.stopSpeaking()
+                        else voiceHelper.speakExplanation(textToSpeak, language)
+                    }
+                )
+            }
+        }
+
+        voiceStatus?.let { status ->
+            Surface(
+                color = SaffronGold.copy(alpha = 0.14f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp)
+            ) {
+                Text(
+                    text = status,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = IndigoInk,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
             }
         }
 
@@ -295,13 +400,43 @@ fun AiTeacherScreen(
                     contentDescription = "Scan notebook solution or question with camera"
                 )
             }
+            IconButton(
+                onClick = {
+                    if (isListening) {
+                        voiceHelper.stopListening()
+                    } else {
+                        val granted = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            voiceStatus = "Listening in ${if (language == TeachingLanguage.KN) "Kannada" else "English"}..."
+                            voiceHelper.startListening(language)
+                        } else {
+                            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    }
+                },
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (isListening) MaterialTheme.colorScheme.errorContainer else SaffronGold.copy(alpha = 0.18f),
+                    contentColor = if (isListening) MaterialTheme.colorScheme.error else IndigoInk
+                ),
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("voice_mic_button")
+            ) {
+                Icon(
+                    imageVector = if (isListening) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (isListening) "Stop voice recording" else "Speak question in Kannada or English"
+                )
+            }
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
                 placeholder = {
                     Text(
-                        if (offlineMode) "Ask offline KSMKE / solve quadratic..."
-                        else "Ask Guruji or scan notebook..."
+                        if (offlineMode) "Ask offline KSMKE / speak..."
+                        else "Ask Guruji, speak or scan..."
                     )
                 },
                 maxLines = 3,
@@ -343,7 +478,11 @@ fun AiTeacherScreen(
 }
 
 @Composable
-private fun ChatBubble(turn: ChatTurn) {
+private fun ChatBubble(
+    turn: ChatTurn,
+    isSpeaking: Boolean,
+    onSpeakToggle: (String) -> Unit
+) {
     Row(
         horizontalArrangement = if (turn.isStudent) Arrangement.End else Arrangement.Start,
         modifier = Modifier.fillMaxWidth()
@@ -366,11 +505,30 @@ private fun ChatBubble(turn: ChatTurn) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (!turn.isStudent) {
-                    Text(
-                        text = if (turn.isStreaming) "Guruji is writing..." else "Guruji • KSMKE Teacher",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = SaffronGold
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (turn.isStreaming) "Guruji is writing..." else "Guruji • KSMKE Teacher",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SaffronGold
+                        )
+                        if (turn.text.isNotBlank() && !turn.isStreaming) {
+                            IconButton(
+                                onClick = { onSpeakToggle(turn.text) },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isSpeaking) Icons.Filled.Stop else Icons.AutoMirrored.Filled.VolumeUp,
+                                    contentDescription = "Read explanation aloud",
+                                    tint = IndigoInk,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 if (turn.text.isEmpty() && turn.isStreaming) {

@@ -47,6 +47,25 @@ data class DailyGoalEntity(
     val scheduledSlot: String
 )
 
+@Entity(tableName = "topic_verification")
+data class TopicVerificationEntity(
+    @PrimaryKey val topicNumber: String,
+    val chapterNumber: Int,
+    val completionStatus: String,
+    val verifiedAtMillis: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "concept_stats")
+data class ConceptStatEntity(
+    @PrimaryKey val conceptTag: String,
+    val chapterNumber: Int,
+    val attempts: Int,
+    val errors: Int,
+    val confidenceRating: Int = 3,
+    val lastMistakeSummary: String = "",
+    val updatedAtMillis: Long = System.currentTimeMillis()
+)
+
 @Dao
 interface StudyProgressDao {
     @Query("SELECT * FROM chapter_progress ORDER BY chapterNumber ASC")
@@ -72,15 +91,32 @@ interface StudyProgressDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAllDailyGoals(entities: List<DailyGoalEntity>)
+
+    @Query("SELECT * FROM topic_verification ORDER BY chapterNumber ASC, topicNumber ASC")
+    fun observeTopicVerifications(): Flow<List<TopicVerificationEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertTopicVerification(entity: TopicVerificationEntity)
+
+    @Query("SELECT * FROM concept_stats ORDER BY errors DESC, updatedAtMillis DESC")
+    fun observeConceptStats(): Flow<List<ConceptStatEntity>>
+
+    @Query("SELECT * FROM concept_stats WHERE conceptTag = :conceptTag LIMIT 1")
+    suspend fun getConceptStat(conceptTag: String): ConceptStatEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertConceptStat(entity: ConceptStatEntity)
 }
 
 @Database(
     entities = [
         ChapterProgressEntity::class,
         ExamHistoryEntity::class,
-        DailyGoalEntity::class
+        DailyGoalEntity::class,
+        TopicVerificationEntity::class,
+        ConceptStatEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -96,7 +132,10 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "sslc_maths_ksmke.db"
-                ).build().also { INSTANCE = it }
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+                    .also { INSTANCE = it }
             }
         }
     }
@@ -106,6 +145,8 @@ class LocalProgressRepository(private val dao: StudyProgressDao) {
     val chapterProgress: Flow<List<ChapterProgressEntity>> = dao.observeChapterProgress()
     val examHistory: Flow<List<ExamHistoryEntity>> = dao.observeExamHistory()
     val dailyGoals: Flow<List<DailyGoalEntity>> = dao.observeDailyGoals()
+    val topicVerifications: Flow<List<TopicVerificationEntity>> = dao.observeTopicVerifications()
+    val conceptStats: Flow<List<ConceptStatEntity>> = dao.observeConceptStats()
 
     suspend fun saveChapterProgress(entity: ChapterProgressEntity) =
         dao.upsertChapterProgress(entity)
@@ -115,6 +156,67 @@ class LocalProgressRepository(private val dao: StudyProgressDao) {
 
     suspend fun saveGoal(entity: DailyGoalEntity) =
         dao.upsertDailyGoal(entity)
+
+    suspend fun saveTopicVerification(
+        topicNumber: String,
+        chapterNumber: Int,
+        completionStatus: String
+    ) {
+        dao.upsertTopicVerification(
+            TopicVerificationEntity(
+                topicNumber = topicNumber,
+                chapterNumber = chapterNumber,
+                completionStatus = completionStatus
+            )
+        )
+    }
+
+    suspend fun recordConceptAttempt(
+        conceptTag: String,
+        chapterNumber: Int,
+        hadError: Boolean,
+        mistakeSummary: String = ""
+    ) {
+        val cleanTag = conceptTag.trim().ifBlank { return }
+        val existing = dao.getConceptStat(cleanTag)
+        val nextAttempts = (existing?.attempts ?: 0) + 1
+        val nextErrors = (existing?.errors ?: 0) + if (hadError) 1 else 0
+        val nextRating = existing?.confidenceRating ?: 3
+        val note = if (hadError && mistakeSummary.isNotBlank()) {
+            mistakeSummary.take(180)
+        } else {
+            existing?.lastMistakeSummary.orEmpty()
+        }
+        dao.upsertConceptStat(
+            ConceptStatEntity(
+                conceptTag = cleanTag,
+                chapterNumber = chapterNumber,
+                attempts = nextAttempts,
+                errors = nextErrors,
+                confidenceRating = nextRating,
+                lastMistakeSummary = note
+            )
+        )
+    }
+
+    suspend fun setConceptConfidence(
+        conceptTag: String,
+        chapterNumber: Int,
+        rating: Int
+    ) {
+        val cleanTag = conceptTag.trim().ifBlank { return }
+        val existing = dao.getConceptStat(cleanTag)
+        dao.upsertConceptStat(
+            ConceptStatEntity(
+                conceptTag = cleanTag,
+                chapterNumber = chapterNumber,
+                attempts = existing?.attempts ?: 1,
+                errors = existing?.errors ?: 0,
+                confidenceRating = rating.coerceIn(1, 5),
+                lastMistakeSummary = existing?.lastMistakeSummary.orEmpty()
+            )
+        )
+    }
 
     suspend fun ensureDefaultGoalsIfEmpty(currentGoals: List<DailyGoalEntity>) {
         if (currentGoals.isNotEmpty()) return

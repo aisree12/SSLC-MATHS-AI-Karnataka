@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ksmke.KsmkeSyllabusRepository
+import com.example.data.ksmke.PyqAnalyticsEngine
 import com.example.domain.PyqQuestion
 import com.example.domain.QuestionSource
 import com.example.ui.CloudUiState
@@ -121,6 +122,13 @@ private fun PyqBankContent(
     var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
 
     val allQuestions = generatedPyqs + KsmkeSyllabusRepository.pyqQuestions
+    val recurrenceStats = PyqAnalyticsEngine.computeRecurrenceStats(KsmkeSyllabusRepository.pyqQuestions)
+        .filter { selectedChapter == 0 || it.chapterNumber == selectedChapter }
+        .take(5)
+    val officialCount = KsmkeSyllabusRepository.pyqQuestions.count {
+        it.source == QuestionSource.HISTORICAL_BOARD || it.source == QuestionSource.OFFICIAL_MODEL_PAPER
+    }
+
     val filtered = allQuestions.filter { q ->
         (selectedMarks == 0 || q.marks == selectedMarks) &&
             (selectedChapter == 0 || q.chapterNumber == selectedChapter) &&
@@ -147,7 +155,7 @@ private fun PyqBankContent(
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "Authentic historical board papers and 2026-27 Model Paper (MQP-01) are strictly separated from AI Practice questions.",
+                        text = "$officialCount verified historical KSEAB 81E & 2026-27 MQP entries indexed with concept recurrence stats (strictly separated from AI Practice).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -249,6 +257,59 @@ private fun PyqBankContent(
                             color = MaterialTheme.colorScheme.error
                         )
                         else -> Unit
+                    }
+                }
+            }
+        }
+
+        if (recurrenceStats.isNotEmpty()) {
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = IndigoInk.copy(alpha = 0.06f)),
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("pyq_recurrence_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Authentic 2015–2027 Recurrence Analytics",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = IndigoInk
+                        )
+                        recurrenceStats.forEach { stat ->
+                            Row(
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Ch ${stat.chapterNumber}: ${stat.conceptTag}",
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                    Text(
+                                        text = "${stat.occurrences}x (${stat.distinctYears.joinToString(", ")})",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Surface(
+                                    color = EmeraldChalk.copy(alpha = 0.14f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${stat.totalMarksHistorically}M • ${stat.recurrencePercent}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = EmeraldChalk,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }

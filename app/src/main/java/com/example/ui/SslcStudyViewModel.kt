@@ -9,6 +9,7 @@ import com.example.core.PdfExportManager
 import com.example.core.PdfExportResult
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.local.ChapterProgressEntity
+import com.example.data.local.ConceptStatEntity
 import com.example.data.local.DailyGoalEntity
 import com.example.data.local.ExamHistoryEntity
 import com.example.data.local.LocalProgressRepository
@@ -20,13 +21,20 @@ import com.example.data.remote.StudyGoalDoc
 import com.example.data.remote.UserProfileDoc
 import com.example.domain.ChapterQuestionPaper
 import com.example.domain.ChatTurn
+import com.example.domain.ConceptWeaknessInsight
 import com.example.domain.ExamMode
+import com.example.domain.ExaminerEvaluationReport
+import com.example.domain.IndependentMarkingEngine
 import com.example.domain.MathEngineSolution
 import com.example.domain.MathVerificationEngine
 import com.example.domain.MasteryStatus
+import com.example.domain.OpenWeightModelCatalog
+import com.example.domain.OpenWeightProvider
 import com.example.domain.PyqQuestion
 import com.example.domain.TargetedPaperQuestion
 import com.example.domain.TeachingLanguage
+import com.example.domain.TopicCompletionStatus
+import com.example.domain.WeaknessAndPlannerEngine
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -110,6 +118,15 @@ class SslcStudyViewModel(
     private val _offlineStudyMode = MutableStateFlow(false)
     val offlineStudyMode: StateFlow<Boolean> = _offlineStudyMode.asStateFlow()
 
+    private val _selectedProvider = MutableStateFlow(aiTeacher.activeProvider)
+    val selectedProvider: StateFlow<OpenWeightProvider> = _selectedProvider.asStateFlow()
+
+    private val _selectedModelId = MutableStateFlow(aiTeacher.activeModelId)
+    val selectedModelId: StateFlow<String> = _selectedModelId.asStateFlow()
+
+    val isOpenAiKeyConfigured: Boolean
+        get() = aiTeacher.isApiKeyConfigured()
+
     private val _chatTurns = MutableStateFlow(
         listOf(
             ChatTurn(
@@ -137,6 +154,15 @@ class SslcStudyViewModel(
 
     private val _answerEvalState = MutableStateFlow<CloudUiState<String>?>(null)
     val answerEvalState: StateFlow<CloudUiState<String>?> = _answerEvalState.asStateFlow()
+
+    private val _examinerReport = MutableStateFlow<ExaminerEvaluationReport?>(null)
+    val examinerReport: StateFlow<ExaminerEvaluationReport?> = _examinerReport.asStateFlow()
+
+    private val _daysUntilExam = MutableStateFlow(60)
+    val daysUntilExam: StateFlow<Int> = _daysUntilExam.asStateFlow()
+
+    private val _dailyStudyMinutes = MutableStateFlow(60)
+    val dailyStudyMinutes: StateFlow<Int> = _dailyStudyMinutes.asStateFlow()
 
     private val _mathSolution = MutableStateFlow<MathEngineSolution?>(null)
     val mathSolution: StateFlow<MathEngineSolution?> = _mathSolution.asStateFlow()
@@ -189,6 +215,28 @@ class SslcStudyViewModel(
 
     val localExamHistory: StateFlow<List<ExamHistoryEntity>> = localProgress.examHistory
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
+    val topicVerifications: StateFlow<Map<String, TopicCompletionStatus>> =
+        localProgress.topicVerifications
+            .combine(MutableStateFlow(Unit)) { entities, _ ->
+                entities.associate { entity ->
+                    val status = enumValues<TopicCompletionStatus>()
+                        .firstOrNull { it.name == entity.completionStatus }
+                        ?: TopicCompletionStatus.NOT_VERIFIED
+                    entity.topicNumber to status
+                }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyMap())
+
+    val conceptStats: StateFlow<List<ConceptStatEntity>> = localProgress.conceptStats
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
+    val conceptWeaknesses: StateFlow<List<ConceptWeaknessInsight>> =
+        localProgress.conceptStats
+            .combine(MutableStateFlow(Unit)) { stats, _ ->
+                WeaknessAndPlannerEngine.analyzeConceptWeaknesses(stats)
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
     val cloudDashboard: StateFlow<CloudUiState<CoachDashboardData>> = combine(
         firestoreSync.observeProfile(currentUserId),
@@ -260,6 +308,19 @@ class SslcStudyViewModel(
 
     fun setOfflineStudyMode(offline: Boolean) {
         _offlineStudyMode.value = offline
+    }
+
+    fun selectOpenWeightProvider(provider: OpenWeightProvider) {
+        _selectedProvider.value = provider
+        aiTeacher.activeProvider = provider
+        val defaultModel = OpenWeightModelCatalog.defaultTextModel(provider).id
+        _selectedModelId.value = defaultModel
+        aiTeacher.activeModelId = defaultModel
+    }
+
+    fun selectOpenWeightModel(modelId: String) {
+        _selectedModelId.value = modelId
+        aiTeacher.activeModelId = modelId
     }
 
     fun dismissSyncMessage() {
@@ -415,23 +476,76 @@ class SslcStudyViewModel(
         }
     }
 
+    fun setTopicVerificationStatus(
+        topicNumber: String,
+        chapterNumber: Int,
+        status: TopicCompletionStatus
+    ) {
+        viewModelScope.launch {
+            localProgress.saveTopicVerification(
+                topicNumber = topicNumber,
+                chapterNumber = chapterNumber,
+                completionStatus = status.name
+            )
+            _syncMessage.value = "Topic $topicNumber marked: ${status.label}."
+        }
+    }
+
+    fun updateStudyPlannerConfig(daysRemaining: Int, dailyMinutes: Int) {
+        _daysUntilExam.value = daysRemaining.coerceIn(1, 365)
+        _dailyStudyMinutes.value = dailyMinutes.coerceIn(20, 300)
+    }
+
+    fun setConceptConfidenceRating(conceptTag: String, chapterNumber: Int, rating: Int) {
+        viewModelScope.launch {
+            localProgress.setConceptConfidence(conceptTag, chapterNumber, rating)
+        }
+    }
+
     fun evaluateStudentAnswer(
-        questionText: String,
-        expectedAnswer: String,
-        maxMarks: Int,
+        question: PyqQuestion,
         studentSteps: String
     ) {
         if (studentSteps.isBlank()) {
+            _examinerReport.value = null
             _answerEvalState.value = CloudUiState.Error("Write your solution steps first so Guruji can check every marking point.")
             return
         }
+
+        val concept = question.conceptTag.ifBlank { question.topic }
+        val deterministicReport = IndependentMarkingEngine.evaluateWrittenSolution(
+            questionEn = question.questionEn,
+            officialAnswer = question.officialAnswer,
+            markingPoints = question.markingPoints,
+            maxMarks = question.marks,
+            studentSteps = studentSteps,
+            conceptTag = concept
+        )
+        _examinerReport.value = deterministicReport
+
+        viewModelScope.launch {
+            localProgress.recordConceptAttempt(
+                conceptTag = concept,
+                chapterNumber = question.chapterNumber,
+                hadError = deterministicReport.marksAwarded < deterministicReport.maxMarks * 0.75,
+                mistakeSummary = deterministicReport.missingSteps.firstOrNull().orEmpty()
+            )
+        }
+
+        if (_offlineStudyMode.value) {
+            _answerEvalState.value = CloudUiState.Success(
+                "Offline Real Examiner Evaluation Complete (${MathVerificationEngine.fmt(deterministicReport.marksAwarded)}/${question.marks} Marks). Review the step marks breakdown above."
+            )
+            return
+        }
+
         _answerEvalState.value = CloudUiState.Loading
         viewModelScope.launch {
             try {
                 val feedback = aiTeacher.evaluateAnswerPresentation(
-                    questionText = questionText,
-                    expectedAnswer = expectedAnswer,
-                    maxMarks = maxMarks,
+                    questionText = question.questionEn,
+                    expectedAnswer = question.officialAnswer,
+                    maxMarks = question.marks,
                     studentSteps = studentSteps,
                     language = _language.value
                 )
@@ -439,7 +553,10 @@ class SslcStudyViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _answerEvalState.value = CloudUiState.Error(aiTeacher.formatAiError(e))
+                _answerEvalState.value = CloudUiState.Success(
+                    "Deterministic Examiner Score: ${MathVerificationEngine.fmt(deterministicReport.marksAwarded)}/${question.marks}M. " +
+                        "(AI detailed commentary offline: ${aiTeacher.formatAiError(e)})"
+                )
             }
         }
     }
@@ -828,6 +945,40 @@ class SslcStudyViewModel(
         )
 
         viewModelScope.launch {
+            // Record concept-level attempts for intelligent weakness detection
+            cur.questions.forEachIndexed { idx, q ->
+                val concept = q.conceptTag.ifBlank { q.topic }
+                if (q.mcqOptions.isNotEmpty()) {
+                    val chosen = cur.selectedMcqAnswers[idx]
+                    if (chosen != null) {
+                        localProgress.recordConceptAttempt(
+                            conceptTag = concept,
+                            chapterNumber = q.chapterNumber,
+                            hadError = chosen != q.correctMcqIndex,
+                            mistakeSummary = if (chosen != q.correctMcqIndex) q.commonMistakes else ""
+                        )
+                    }
+                } else {
+                    val written = cur.writtenAnswers[idx].orEmpty()
+                    if (written.isNotBlank()) {
+                        val rep = IndependentMarkingEngine.evaluateWrittenSolution(
+                            questionEn = q.questionEn,
+                            officialAnswer = q.officialAnswer,
+                            markingPoints = q.markingPoints,
+                            maxMarks = q.marks,
+                            studentSteps = written,
+                            conceptTag = concept
+                        )
+                        localProgress.recordConceptAttempt(
+                            conceptTag = concept,
+                            chapterNumber = q.chapterNumber,
+                            hadError = rep.marksAwarded < rep.maxMarks * 0.75,
+                            mistakeSummary = rep.missingSteps.firstOrNull().orEmpty()
+                        )
+                    }
+                }
+            }
+
             localProgress.saveExamAttempt(
                 ExamHistoryEntity(
                     examTitle = cur.mode.title,
