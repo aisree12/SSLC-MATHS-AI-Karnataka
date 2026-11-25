@@ -54,9 +54,9 @@ object OfficialSourceLibrary {
             title = "KSEAB SSLC Mathematics Papers & Official Key Answers (81E Series)",
             languageMedium = "English & Kannada",
             editionOrYear = "2015 – 2026 Main, Supplementary & Preparatory (Curated Subset)",
-            chaptersCovered = "Legacy tagged questions; remapping to the official 14-chapter sequence is pending.",
+            chaptersCovered = "Legacy tagged questions are remapped to official chapter IDs; legacy Constructions-only prompts are retained in a separate archive.",
             provenanceAndPermissionNote = "Public examination questions (61+ items across 2015–2026) and official marking-step rubrics used for recurrence statistics.",
-            verificationState = "Curated 61+ Item Bank (Not Full Decade Archive)"
+            verificationState = "Curated remapped item bank (not a full decade archive)"
         ),
         OfficialSourceRecord(
             id = "kseab_mqp_2026_27",
@@ -134,7 +134,8 @@ object OfficialSourceLibrary {
      * Reference mapping of KTBS page ranges, exercise numbers, and DIKSHA tags by Topic Number.
      * Note: These are provenance pointers to textbook sections, NOT verbatim copyrighted PDF dumps.
      */
-    val topicSourceIndex: Map<String, TopicSourceMapping> = mapOf(
+    @Deprecated("Legacy source pointers are not valid for the 2026–27 official chapter sequence")
+    val legacyTopicSourceIndex: Map<String, TopicSourceMapping> = mapOf(
         "1.1" to TopicSourceMapping("KTBS Part 1, pp. 1–7", "Ex 1.1 (Q1–Q4)", "DIKSHA KA-10: Exploring AP Sequences"),
         "1.2" to TopicSourceMapping("KTBS Part 1, pp. 8–15", "Ex 1.2 (Q1–Q20)", "DIKSHA KA-10: nth Term of an AP"),
         "1.3" to TopicSourceMapping("KTBS Part 1, pp. 16–26", "Ex 1.3 (Q1–Q20), Ex 1.4", "DIKSHA KA-10: Sum of First n Terms (Sn)"),
