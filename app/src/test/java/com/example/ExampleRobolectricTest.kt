@@ -29,7 +29,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `room migration 1 to 2 preserves existing student progress and creates new tables`() = runBlocking {
+    fun `room migration 1 to 3 preserves student progress and maps official chapter IDs`() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val dbName = "migration_test_sslc_v1_v2.db"
         val dbFile = context.getDatabasePath(dbName)
@@ -61,7 +61,7 @@ class ExampleRobolectricTest {
 
         // 2. Open with Room v2 using AppDatabase.MIGRATION_1_2
         val migratedDb = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(AppDatabase.MIGRATION_1_2)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
             .allowMainThreadQueries()
             .build()
 
@@ -71,7 +71,7 @@ class ExampleRobolectricTest {
             // Verify existing v1 records survived migration intact
             val chapters = dao.observeChapterProgress().first()
             assertEquals(1, chapters.size)
-            assertEquals(10, chapters.first().chapterNumber)
+            assertEquals(4, chapters.first().chapterNumber)
             assertEquals(92, chapters.first().accuracyPercent)
 
             val exams = dao.observeExamHistory().first()
@@ -81,20 +81,21 @@ class ExampleRobolectricTest {
             val goals = dao.observeDailyGoals().first()
             assertEquals(1, goals.size)
             assertEquals("g_v1_1", goals.first().goalId)
+            assertEquals(6, goals.first().chapterNumber)
             assertTrue(goals.first().completed)
 
             // Verify new v2 tables accept writes & queries seamlessly
             dao.upsertTopicVerification(
                 TopicVerificationEntity(
-                    topicNumber = "2.1",
-                    chapterNumber = 2,
+                    topicNumber = "6.1",
+                    chapterNumber = 6,
                     completionStatus = "VERIFIED_COMPLETE"
                 )
             )
             dao.upsertConceptStat(
                 ConceptStatEntity(
                     conceptTag = "Quadratic Formula",
-                    chapterNumber = 10,
+                    chapterNumber = 4,
                     attempts = 5,
                     errors = 1,
                     confidenceRating = 4,
