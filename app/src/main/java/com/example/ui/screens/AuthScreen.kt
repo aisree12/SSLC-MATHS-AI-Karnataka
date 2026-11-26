@@ -240,7 +240,7 @@ fun AuthScreen(
                             .height(54.dp)
                             .testTag("google_sign_in_button")
                     ) {
-                        if (isLoading || isCheckingAuto) {
+                        if (isLoading) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(22.dp),
                                 color = Color.White,
