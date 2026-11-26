@@ -405,7 +405,7 @@ fun AiTeacherScreen(
                     }
                     selectedProvider.requiresApiKey && !viewModel.isProviderApiKeyConfigured(selectedProvider) -> {
                         Text(
-                            text = if (selectedProvider == OpenWeightProvider.GEMINI_API_KEY) "Add your Google AI Studio key to GEMINI_API_KEY in Secrets, or choose On-Device AI for offline use." else "Add a provider key to OPENAI_COMPAT_API_KEY in Secrets, or choose Gemini (Firebase AI) or On-Device AI.",
+                            text = "This AI model is not configured yet. Please choose an available model in AI Model settings.",
                             style = MaterialTheme.typography.labelSmall,
                             color = SaffronGold
                         )
