@@ -217,6 +217,14 @@
             "package_name": "com.aistudio.sslcmaths.kxmpqr",
             "certificate_hash": "025c49d41c787a4ea1130261c0c7fd21ef47b3da"
           }
+        },
+        {
+          "client_id": "754245795929-araj76sqm5lpk0els5ttrp5jv6rdjahi.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.sslcmaths.kxmpqr",
+            "certificate_hash": "bdd966cc565f190a98d703735d74fef130520495"
+          }
         }
       ],
       "api_key": [
