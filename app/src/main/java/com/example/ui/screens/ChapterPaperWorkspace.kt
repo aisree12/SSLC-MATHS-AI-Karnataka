@@ -305,7 +305,7 @@ private fun ChapterPaperQuestionCard(
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(
-                        text = question.probabilityBadge,
+                        text = if (question.isAiInvented) "Practice pattern • not a forecast" else "Archive question",
                         style = MaterialTheme.typography.labelSmall,
                         color = SaffronGold,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
