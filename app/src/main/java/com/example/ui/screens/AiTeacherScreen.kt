@@ -220,7 +220,7 @@ fun AiTeacherScreen(
                         )
                         Text(
                             text = selectedChapter?.let { "Ch ${it.chapterNumber}: ${it.titleEn} (${it.titleKn})" }
-                                ?: "All 14 Karnataka SSLC Chapters",
+                                ?: "All 15 Karnataka SSLC Chapters",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -334,11 +334,11 @@ fun AiTeacherScreen(
                     FilterChip(
                         selected = offlineMode,
                         onClick = { viewModel.setOfflineStudyMode(!offlineMode) },
-                        label = { Text(if (offlineMode) "Rule Guide: ON" else "Rule Guide: OFF") },
+                        label = { Text(if (offlineMode) "Offline Guide: ON" else "Offline Guide: OFF") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Filled.CloudOff,
-                                contentDescription = "Rule-Based Offline Guide",
+                                contentDescription = "Rule-based offline guide (no LLM)",
                                 tint = if (offlineMode) SaffronGold else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(16.dp)
                             )
