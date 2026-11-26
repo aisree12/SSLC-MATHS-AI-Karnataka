@@ -33,7 +33,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,7 +52,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.credentials.CredentialManager
 import com.example.R
-import com.example.core.attemptAutoSignIn
 import com.example.core.onGoogleSignInClicked
 import com.example.ui.theme.EmeraldChalk
 import com.example.ui.theme.IndigoInk
@@ -69,23 +67,7 @@ fun AuthScreen(
     val credentialManager = remember(context) { CredentialManager.create(context) }
 
     var isLoading by remember { mutableStateOf(false) }
-    var isCheckingAuto by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(Unit) {
-        attemptAutoSignIn(
-            context = context,
-            credentialManager = credentialManager,
-            onAuthSuccess = {
-                isCheckingAuto = false
-                onAuthSuccess()
-            },
-            onUnauthenticated = {
-                isCheckingAuto = false
-            },
-            scope = scope
-        )
-    }
 
     Box(
         modifier = Modifier
@@ -247,7 +229,7 @@ fun AuthScreen(
                                 }
                             )
                         },
-                        enabled = !isLoading && !isCheckingAuto,
+                        enabled = !isLoading,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = IndigoInk,
                             contentColor = Color.White
