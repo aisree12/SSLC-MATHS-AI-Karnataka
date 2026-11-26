@@ -20,10 +20,27 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeout
 
 private const val TAG = "AiTeacherRepo"
 
+private fun cleanStudentTeachingText(rawText: String): String {
+    return rawText.lineSequence()
+        .mapNotNull { rawLine ->
+            val line = rawLine.trim()
+                .replace(Regex("(?<=\\d)\\s*\\*\\s*(?=\\d)"), " × ")
+                .replace(Regex("^#{1,6}\\s*"), "")
+                .replace(Regex("^[-•*]\\s+"), "")
+                .replace(Regex("\\*{1,3}"), "")
+                .replace("#", "")
+                .trim()
+            if (line.matches(Regex("[-_]{3,}"))) null else line
+        }
+        .joinToString("\n")
+        .replace(Regex("\\n{3,}"), "\n\n")
+        .trim()
+}
 /**
  * SSLC Mathematics AI Teacher Repository powered by:
  * 1. Real Android On-Device Offline AI (MediaPipe LlmInference running downloaded quantised Qwen2.5 .task weights),
@@ -152,6 +169,14 @@ class AiTeacherRepository(
         6. End with ONE short practice question and invite the student to try it!
         
         Keep formatting clean, crisp, and mobile-readable (no noisy LaTeX dollars; use clean Unicode math like x², √, Δ, ∠, △, π, θ).
+
+        MANDATORY STUDENT-TEACHING OUTPUT STANDARD FOR EVERY MODEL:
+        - Write plain, natural text. Do not use Markdown formatting.
+        - Never output #, *, **, backtick markers, Markdown heading markers, decorative bullets, tables, or decorative symbols.
+        - Use short plain-language headings only when they genuinely help. Numbered steps are allowed for solutions.
+        - Keep mathematical operators, formula symbols, diagrams described in words, and units that are genuinely required to solve the question.
+        - Do not add irrelevant units, symbols, labels, or formatting. Do not omit a unit when the measured quantity requires one.
+        - Make the explanation clean, direct, age-appropriate, and easy to read on a phone.
     """.trimIndent()
 
     fun streamTutorReply(
@@ -189,7 +214,7 @@ class AiTeacherRepository(
                 modelFile = modelFile,
                 systemInstruction = gurujiSystemPrompt,
                 userPrompt = prompt
-            )
+            ).map(::cleanStudentTeachingText)
         }
 
         return openWeightClient.streamChatCompletion(
@@ -197,7 +222,7 @@ class AiTeacherRepository(
             modelId = activeModelId,
             systemInstruction = gurujiSystemPrompt,
             userPrompt = prompt
-        )
+        ).map(::cleanStudentTeachingText)
     }
 
     /** Cloud-first teacher stream with automatic local-AI / structured-guide recovery. */
@@ -277,9 +302,11 @@ class AiTeacherRepository(
             $langHint
         """.trimIndent()
 
-        return executeTextPrompt(
-            systemInstruction = gurujiSystemPrompt,
-            userPrompt = prompt
+        return cleanStudentTeachingText(
+            executeTextPrompt(
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         )
     }
 
@@ -376,9 +403,11 @@ class AiTeacherRepository(
             Use crisp plain formatting and Unicode math symbols (x², √, Δ, ∠, △, π, θ). Do NOT use LaTeX dollar signs.
         """.trimIndent()
 
-        return executeTextPrompt(
-            systemInstruction = gurujiSystemPrompt,
-            userPrompt = prompt
+        return cleanStudentTeachingText(
+            executeTextPrompt(
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         )
     }
 
@@ -530,9 +559,11 @@ class AiTeacherRepository(
             """.trimIndent()
         }
 
-        return executeTextPrompt(
-            systemInstruction = gurujiSystemPrompt,
-            userPrompt = prompt
+        return cleanStudentTeachingText(
+            executeTextPrompt(
+                systemInstruction = gurujiSystemPrompt,
+                userPrompt = prompt
+            )
         )
     }
 
@@ -596,14 +627,16 @@ class AiTeacherRepository(
             )
         }
 
-        return withTimeout(60_000L) {
-            openWeightClient.analyzeImageWithVisionModel(
-                provider = activeProvider,
-                bitmap = bitmap,
-                systemInstruction = gurujiSystemPrompt,
-                userPrompt = promptText
-            )
-        }
+        return cleanStudentTeachingText(
+            withTimeout(60_000L) {
+                openWeightClient.analyzeImageWithVisionModel(
+                    provider = activeProvider,
+                    bitmap = bitmap,
+                    systemInstruction = gurujiSystemPrompt,
+                    userPrompt = promptText
+                )
+            }
+        )
     }
 
     /**
@@ -639,7 +672,7 @@ class AiTeacherRepository(
                 "\nFinal Answer: ${it.finalAnswer}\nExaminer Tip: ${it.examinerTip}"
         }.orEmpty()
 
-        return "$header\n\nKey Formulas:\n• ${ch.keyFormulas.joinToString("\n• ")}$stepsText$mathCheck\n\nTry answering: ${ch.starterQuestion}"
+        return cleanStudentTeachingText("$header\n\nKey Formulas:\n• ${ch.keyFormulas.joinToString("\n• ")}$stepsText$mathCheck\n\nTry answering: ${ch.starterQuestion}")
     }
 
     fun releaseOnDeviceEngine() {
