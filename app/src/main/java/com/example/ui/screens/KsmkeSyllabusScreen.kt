@@ -97,8 +97,6 @@ fun KsmkeSyllabusScreen(
     var showBlackboard by rememberSaveable { mutableStateOf(false) }
     var showDualLibrary by rememberSaveable { mutableStateOf(false) }
 
-    val understoodChaptersCount = KsmkeSyllabusRepository.chapters.count { masteryMap[it.chapterNumber] == MasteryStatus.UNDERSTOOD }
-
     val masteryMap: Map<Int, MasteryStatus> = when (val state = cloudState) {
         is CloudUiState.Success -> {
             val fromCloud = state.data.masteryByChapter.mapValues { it.value.safeStatus() }
@@ -113,6 +111,8 @@ fun KsmkeSyllabusScreen(
                 ?: MasteryStatus.NOT_STARTED)
         }
     }
+
+    val understoodChaptersCount = KsmkeSyllabusRepository.chapters.count { masteryMap[it.chapterNumber] == MasteryStatus.UNDERSTOOD }
 
     LazyColumn(
         contentPadding = PaddingValues(14.dp),
