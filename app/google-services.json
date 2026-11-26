@@ -209,6 +209,14 @@
         {
           "client_id": "754245795929-tpjtra405aollf8aod6f585q69ufvsg2.apps.googleusercontent.com",
           "client_type": 3
+        },
+        {
+          "client_id": "754245795929-43haar5rbaaevn9a5gegdh4tgj9uq7ab.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.sslcmaths.kxmpqr",
+            "certificate_hash": "025c49d41c787a4ea1130261c0c7fd21ef47b3da"
+          }
         }
       ],
       "api_key": [
