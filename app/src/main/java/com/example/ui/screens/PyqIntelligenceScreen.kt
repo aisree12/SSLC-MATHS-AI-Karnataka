@@ -155,7 +155,7 @@ private fun PyqBankContent(
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = ""$officialCount archived board/model-paper questions indexed. AI Practice questions are kept separate."",
+                        text = "$officialCount archived board/model-paper questions indexed. AI Practice questions are kept separate.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
