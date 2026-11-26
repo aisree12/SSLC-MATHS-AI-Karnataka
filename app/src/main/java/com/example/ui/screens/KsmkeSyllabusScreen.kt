@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ksmke.AiTeachingLibrary
 import com.example.data.ksmke.AuditStepStatus
-import com.example.data.ksmke.KsmkeSupplementLibrary
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.ksmke.OfficialSourceLibrary
 import com.example.data.ksmke.TextbookCoverageAuditEngine
@@ -98,8 +97,7 @@ fun KsmkeSyllabusScreen(
     var showBlackboard by rememberSaveable { mutableStateOf(false) }
     var showDualLibrary by rememberSaveable { mutableStateOf(false) }
 
-    val totalTopicsCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
-    val verifiedTopicsCount = topicVerifications.values.count { it == TopicCompletionStatus.VERIFIED_COMPLETE }
+    val understoodChaptersCount = KsmkeSyllabusRepository.chapters.count { masteryMap[it.chapterNumber] == MasteryStatus.UNDERSTOOD }
 
     val masteryMap: Map<Int, MasteryStatus> = when (val state = cloudState) {
         is CloudUiState.Success -> {
@@ -132,25 +130,24 @@ fun KsmkeSyllabusScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "KSMKE • 6-Layer Knowledge Engine",
+                        text = "SSLC Maths Study Centre",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White
                     )
                     Text(
-                        text = "Official 14-Chapter KTBS 2026–27 Index, Curated Bilingual Notes, Practice Questions & Interactive Math Labs. Page-by-page source audit remains pending.",
+                        text = "ಕರ್ನಾಟಕ SSLC ಗಣಿತ • Learn, revise and practise one chapter at a time.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFE2E8F0)
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "7-Step Textbook Audit: PASSED (342/342 pp.) • Topic Review: $verifiedTopicsCount / $totalTopicsCount",
+                            text = "Chapters understood: $understoodChaptersCount / ${KsmkeSyllabusRepository.chapters.size}",
                             style = MaterialTheme.typography.labelMedium,
                             color = SaffronGold
                         )
                         LinearProgressIndicator(
                             progress = {
-                                if (totalTopicsCount > 0) (verifiedTopicsCount.toFloat() / totalTopicsCount.toFloat()).coerceIn(0f, 1f)
-                                else 0f
+                                (understoodChaptersCount.toFloat() / KsmkeSyllabusRepository.chapters.size.coerceAtLeast(1)).coerceIn(0f, 1f)
                             },
                             color = SaffronGold,
                             modifier = Modifier.fillMaxWidth()
@@ -190,7 +187,7 @@ fun KsmkeSyllabusScreen(
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(
-                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Source Audit (review pending)",
+                                text = if (showDualLibrary) "Hide Teacher Tools" else "Teacher Tools",
                                 color = Color.White
                             )
                         }
@@ -320,7 +317,7 @@ private fun DualLibraryArchitectureCard() {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "7-Step Textbook Audit & Dual-Library Registry",
+                text = "Teacher Tools • Source & Content Review",
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
@@ -335,7 +332,7 @@ private fun DualLibraryArchitectureCard() {
                 FilterChip(
                     selected = selectedLib == 3,
                     onClick = { selectedLib = 3 },
-                    label = { Text("7-Step Audit (pp. 1–342)") }
+                    label = { Text("7-Step Audit") }
                 )
                 FilterChip(
                     selected = selectedLib == 2,
@@ -613,57 +610,6 @@ private fun ChapterCard(
                     modifier = Modifier.padding(top = 10.dp)
                 ) {
                     HorizontalDivider()
-                    val chapterAudit = OfficialSourceLibrary.auditChapter(chapter.chapterNumber)
-                    val supplement = KsmkeSupplementLibrary.byOfficialChapter[chapter.chapterNumber]
-                    Surface(
-                        color = EmeraldChalk.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Audit: ${chapterAudit.certificationState.label} • ${chapterAudit.workedExamplesInApp} worked examples • ${chapterAudit.theoremsInApp} proofs • Exercises: ${chapterAudit.exerciseSetsIndexed}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = IndigoInk,
-                            modifier = Modifier.padding(8.dp)
-                        )
-                    }
-                    if (supplement != null) {
-                        Text(
-                            text = "Textbook Bilingual Definitions (pp. ${supplement.startPage}–${supplement.endPage})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        supplement.definitions.forEach { def ->
-                            Text(
-                                text = "• ${def.termEn} (${def.termKn}) [${def.pageRef}]: ${def.definitionEn}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Text(
-                            text = "Complete Exercise & Subquestion Index",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        supplement.exercises.forEach { exRec ->
-                            Text(
-                                text = "• ${exRec.exerciseId} (${exRec.pageRef}) • ${exRec.subquestionsSummary} [${exRec.subquestionCount} subparts] — ${exRec.keyConceptTested} (${exRec.verifiedPrototypeAnswer})",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (supplement.diagrams.isNotEmpty()) {
-                            Text(
-                                text = "Diagrams & Visual Constructions",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = IndigoInk
-                            )
-                            supplement.diagrams.forEach { diag ->
-                                Text(
-                                    text = "• ${diag.diagramId}: ${diag.title} (${diag.pageRef}) — ${diag.renderingType} [${diag.keyLabels}]",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
                     Text(text = chapter.summaryEn, style = MaterialTheme.typography.bodyMedium)
                     Text(
                         text = chapter.summaryKn,
@@ -671,7 +617,7 @@ private fun ChapterCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Text(text = "Layer 2 • Essential Formulas", style = MaterialTheme.typography.titleSmall)
+                    Text(text = "Key Formulas • ಮುಖ್ಯ ಸೂತ್ರಗಳು", style = MaterialTheme.typography.titleSmall)
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
                         shape = RoundedCornerShape(12.dp),
@@ -701,7 +647,7 @@ private fun ChapterCard(
 
                     chapter.solvedExamples.forEach { ex ->
                         Text(
-                            text = "Solved Board Example • ${ex.title}",
+                            text = "Worked Example • ${ex.title}",
                             style = MaterialTheme.typography.titleSmall
                         )
                         Text(text = ex.problem, style = MaterialTheme.typography.bodyMedium)
@@ -721,7 +667,7 @@ private fun ChapterCard(
                     }
 
                     if (chapter.commonMistakes.isNotEmpty()) {
-                        Text(text = "Common Exam Pitfalls", style = MaterialTheme.typography.titleSmall)
+                        Text(text = "Common Mistakes to Avoid", style = MaterialTheme.typography.titleSmall)
                         chapter.commonMistakes.forEach { m ->
                             Text(
                                 text = "⚠ $m",
@@ -731,7 +677,7 @@ private fun ChapterCard(
                         }
                     }
 
-                    Text(text = "Self-Assess Your Mastery", style = MaterialTheme.typography.titleSmall)
+                    Text(text = "How well do you understand this chapter?", style = MaterialTheme.typography.titleSmall)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -754,7 +700,7 @@ private fun ChapterCard(
                             topicVerifications[it.topicNumber] == TopicCompletionStatus.VERIFIED_COMPLETE
                         }
                         Text(
-                            text = "Page-by-Page Textbook Topics ($verifiedInCh/${chapter.detailedTopics.size} Verified)",
+                            text = "Chapter Topics • ಅಧ್ಯಾಯದ ವಿಷಯಗಳು",
                             style = MaterialTheme.typography.titleSmall,
                             color = IndigoInk
                         )
@@ -789,7 +735,7 @@ private fun ChapterCard(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.size(6.dp))
-                            Text("Download Notes PDF")
+                            Text("Download Study Notes (PDF)")
                         }
                         OutlinedButton(
                             onClick = onExpandAiNotes,
@@ -810,7 +756,7 @@ private fun ChapterCard(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.size(6.dp))
-                                Text("AI Deep Notes")
+                                Text("Extra AI Explanation")
                             }
                         }
                     }
@@ -832,7 +778,7 @@ private fun ChapterCard(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
-                                        text = "AI Extended Topic-Wise Notes (Included in PDF)",
+                                        text = "Extra topic explanations (included in the PDF)",
                                         style = MaterialTheme.typography.titleSmall,
                                         color = IndigoInk
                                     )
@@ -856,7 +802,7 @@ private fun ChapterCard(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Solve Chapterwise PYQ-Probability Paper & Check Q & A")
+                        Text("Practise Board Questions")
                     }
 
                     Button(
@@ -870,7 +816,7 @@ private fun ChapterCard(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Teach Me This Chapter (10-Step Guruji)")
+                        Text("Learn This Chapter with Guruji")
                     }
                 }
             }
@@ -955,7 +901,7 @@ private fun TopicDetailedNoteBlock(
                             color = IndigoInk
                         )
                     }
-                    Text("Textbook Verification Status:", style = MaterialTheme.typography.labelLarge)
+                    Text("Your topic progress:", style = MaterialTheme.typography.labelLarge)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState())
