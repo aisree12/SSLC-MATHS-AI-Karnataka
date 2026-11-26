@@ -29,11 +29,13 @@ private fun cleanStudentTeachingText(rawText: String): String {
     return rawText.lineSequence()
         .mapNotNull { rawLine ->
             val line = rawLine.trim()
+                // Keep mathematical multiplication meaningful, but never show Markdown stars.
                 .replace(Regex("(?<=\\d)\\s*\\*\\s*(?=\\d)"), " × ")
                 .replace(Regex("^#{1,6}\\s*"), "")
                 .replace(Regex("^[-•*]\\s+"), "")
-                .replace(Regex("\\*{1,3}"), "")
-                .replace("#", "")
+                .replace(Regex("[*#]"), "")
+                .replace(Regex("`{1,3}"), "")
+                .replace(Regex("^>\\s*"), "")
                 .trim()
             if (line.matches(Regex("[-_]{3,}"))) null else line
         }
