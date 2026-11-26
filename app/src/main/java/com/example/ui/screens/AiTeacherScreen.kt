@@ -377,13 +377,7 @@ fun AiTeacherScreen(
 
                 // Contextual status strip for On-Device AI weights, Ollama host, or missing API key
                 when {
-                    selectedProvider == OpenWeightProvider.GEMINI_API_KEY -> {
-                        Text(
-                            text = "Google AI Studio Gemini API key • Free-tier model selected. Keep GEMINI_API_KEY in local/AI Studio Secrets; do not commit the key. Usage is subject to model rate limits and availability. Free-tier prompts may be used to improve Google products; do not send student names or personal data.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = EmeraldChalk
-                        )
-                    }
+                    selectedProvider == OpenWeightProvider.GEMINI_API_KEY -> Unit
                     selectedProvider == OpenWeightProvider.GEMINI -> {
                         Text(
                             text = "Keyless Google Gemini powered by Firebase AI Logic + App Check (No API key needed). Supports Text + Camera Vision.",
