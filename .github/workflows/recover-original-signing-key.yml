@@ -1,0 +1,69 @@
+name: Recover original Android signing key (encrypted)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  export-signing-key:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate recovery settings
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.DEBUG_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+          RECOVERY_PASSPHRASE: ${{ secrets.KEY_RECOVERY_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          for name in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD RECOVERY_PASSPHRASE; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Required signing/recovery secret is missing: $name"
+              exit 1
+            fi
+          done
+          echo "Recovery secrets are present."
+
+      - name: Export and verify original signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.DEBUG_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p recovery
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > recovery/debug.keystore
+          keytool -list -v -keystore recovery/debug.keystore -storepass "$STORE_PASSWORD" -alias "$KEY_ALIAS" > recovery/certificate.txt
+          EXPECTED="b50178e641ba49ea6c086cbc85a867230728214b77439b04885c8489df22c256"
+          ACTUAL=$(awk -F': ' '/SHA256:/{gsub(/:/,"",$2); print tolower($2)}' recovery/certificate.txt | head -n1)
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "::error::The old repository secret does not contain the expected original certificate."
+            echo "Observed SHA-256: $ACTUAL"
+            exit 1
+          fi
+          printf 'DEBUG_KEY_ALIAS=%s\nDEBUG_STORE_PASSWORD=%s\nDEBUG_KEY_PASSWORD=%s\n' "$KEY_ALIAS" "$STORE_PASSWORD" "$KEY_PASSWORD" > recovery/signing-credentials.txt
+          echo "Original certificate fingerprint verified."
+
+      - name: Encrypt recovery package
+        env:
+          RECOVERY_PASSPHRASE: ${{ secrets.KEY_RECOVERY_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::$RECOVERY_PASSPHRASE"
+          tar -czf recovery.tar.gz -C recovery .
+          openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 -in recovery.tar.gz -out original-signing-key.enc -pass env:RECOVERY_PASSPHRASE
+          rm -f recovery.tar.gz
+          rm -rf recovery
+          echo "Encrypted recovery package created."
+
+      - name: Upload encrypted package
+        uses: actions/upload-artifact@v4
+        with:
+          name: original-android-signing-key-encrypted
+          path: original-signing-key.enc
+          if-no-files-found: error
+          retention-days: 1
