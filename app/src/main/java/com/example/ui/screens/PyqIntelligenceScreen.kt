@@ -151,11 +151,11 @@ private fun PyqBankContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "SSLC Question Paper Intelligence (2015–2027)",
+                        text = "SSLC PYQ Bank • 2015–2026 + 2026–27 Model Papers",
                         style = MaterialTheme.typography.titleLarge
                     )
                     Text(
-                        text = "$officialCount verified historical KSEAB 81E & 2026-27 MQP entries indexed with concept recurrence stats (strictly separated from AI Practice).",
+                        text = ""$officialCount archived board/model-paper questions indexed. AI Practice questions are kept separate."",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -276,7 +276,7 @@ private fun PyqBankContent(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = "Authentic 2015–2027 Recurrence Analytics",
+                            text = "Archive Pattern Summary • Not an Exam Prediction",
                             style = MaterialTheme.typography.titleSmall,
                             color = IndigoInk
                         )
@@ -292,7 +292,7 @@ private fun PyqBankContent(
                                         style = MaterialTheme.typography.labelLarge
                                     )
                                     Text(
-                                        text = "${stat.occurrences}x (${stat.distinctYears.joinToString(", ")})",
+                                        text = "${stat.occurrences} questions • ${stat.distinctYears.size} archive years",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -302,7 +302,7 @@ private fun PyqBankContent(
                                     shape = RoundedCornerShape(8.dp)
                                 ) {
                                     Text(
-                                        text = "${stat.totalMarksHistorically}M • ${stat.recurrencePercent}%",
+                                        text = "${stat.totalMarksHistorically}M in archive",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = EmeraldChalk,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
