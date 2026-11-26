@@ -220,7 +220,7 @@ fun AiTeacherScreen(
                         )
                         Text(
                             text = selectedChapter?.let { "Ch ${it.chapterNumber}: ${it.titleEn} (${it.titleKn})" }
-                                ?: "All 15 Karnataka SSLC Chapters",
+                                ?: "All 14 Karnataka SSLC Chapters",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -377,6 +377,13 @@ fun AiTeacherScreen(
 
                 // Contextual status strip for On-Device AI weights, Ollama host, or missing API key
                 when {
+                    selectedProvider == OpenWeightProvider.GEMINI_API_KEY -> {
+                        Text(
+                            text = "Google AI Studio Gemini API key • Free-tier model selected. Keep GEMINI_API_KEY in local/AI Studio Secrets; do not commit the key. Usage is subject to model rate limits and availability. Free-tier prompts may be used to improve Google products; do not send student names or personal data.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = EmeraldChalk
+                        )
+                    }
                     selectedProvider == OpenWeightProvider.GEMINI -> {
                         Text(
                             text = "Keyless Google Gemini powered by Firebase AI Logic + App Check (No API key needed). Supports Text + Camera Vision.",
@@ -402,9 +409,9 @@ fun AiTeacherScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    selectedProvider.requiresApiKey && !viewModel.isOpenAiKeyConfigured -> {
+                    selectedProvider.requiresApiKey && !viewModel.isProviderApiKeyConfigured(selectedProvider) -> {
                         Text(
-                            text = "Tip: Add a free ${selectedProvider.displayName} key to OPENAI_COMPAT_API_KEY in Secrets, or pick Gemini (Firebase AI) or On-Device AI from AI Model.",
+                            text = if (selectedProvider == OpenWeightProvider.GEMINI_API_KEY) "Add your Google AI Studio key to GEMINI_API_KEY in Secrets, or choose On-Device AI for offline use." else "Add a provider key to OPENAI_COMPAT_API_KEY in Secrets, or choose Gemini (Firebase AI) or On-Device AI.",
                             style = MaterialTheme.typography.labelSmall,
                             color = SaffronGold
                         )

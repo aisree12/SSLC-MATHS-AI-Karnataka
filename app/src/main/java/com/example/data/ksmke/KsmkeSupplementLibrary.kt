@@ -39,9 +39,7 @@ data class ChapterTextbookSupplement(
 )
 
 /**
- * Curated supplementary textbook inventory filling definitions, exercise-by-exercise subquestion
- * guides (Ex 1.1–Ex 15.4), bilingual glossary items, and diagram specs across pp. 1–342
- * for the Karnataka KTBS Revised 2026–27 Class 10 Mathematics curriculum.
+ * Legacy curated supplementary inventory. Its exercise IDs, page references and chapter numbering are retained for migration compatibility only; they are not certified as matching the official 2026–27 source books.
  */
 object KsmkeSupplementLibrary {
 
@@ -506,4 +504,32 @@ object KsmkeSupplementLibrary {
             gapResolutionSummary = "Added Ex 15.1–15.4 (31 questions), recasting solution, Frustum MathVerificationEngine check, and Frustum Canvas."
         )
     ).associateBy { it.chapterNumber }
+
+    /** Same curated supplement records exposed under official chapter IDs. */
+    val byOfficialChapter: Map<Int, ChapterTextbookSupplement> =
+        byChapter.values.mapNotNull { supplement ->
+            val officialId = OfficialSyllabus2026_27.officialIdForLegacy(supplement.chapterNumber)
+                ?: return@mapNotNull null
+            val official = OfficialSyllabus2026_27.chapter(officialId) ?: return@mapNotNull null
+            val bounds = Regex("(\\d+)\\s*[–-]\\s*(\\d+)").find(official.englishPrintedPages)
+            val start = bounds?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val end = bounds?.groupValues?.get(2)?.toIntOrNull() ?: 0
+            officialId to supplement.copy(
+                chapterNumber = officialId,
+                startPage = start,
+                endPage = end,
+                definitions = supplement.definitions.map {
+                    it.copy(pageRef = "Chapter-level page range only; exact definition page pending verification.")
+                },
+                exercises = supplement.exercises.map {
+                    it.copy(
+                        exerciseId = "Legacy ${it.exerciseId} (official exercise number unverified)",
+                        pageRef = "Exact official exercise page pending source comparison."
+                    )
+                },
+                diagrams = supplement.diagrams.map {
+                    it.copy(pageRef = "Chapter-level figure inventory pending source comparison.")
+                }
+            )
+        }.toMap()
 }

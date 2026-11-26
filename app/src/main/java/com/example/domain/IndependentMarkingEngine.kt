@@ -1,13 +1,17 @@
 package com.example.domain
 
 import kotlin.math.abs
+import kotlin.math.round
 
 /**
- * Independent deterministic KSEAB Marking Engine.
- * Evaluates student step-by-step solutions strictly against official marking pillars
- * without relying on an LLM for numeric grading.
+ * Conservative question-specific rubric aid.
+ * Each marking point is scored separately using evidence from that question's
+ * own marking scheme. It does not award generic marks for equals signs or
+ * generic "given/formula/working" keywords. Ambiguous rubric items are flagged.
+ * This is a practice aid, not an official KSEAB evaluation.
  */
 object IndependentMarkingEngine {
+    private data class RubricItem(val text: String, val marks: Double)
 
     fun evaluateWrittenSolution(
         questionEn: String,
@@ -17,144 +21,135 @@ object IndependentMarkingEngine {
         studentSteps: String,
         conceptTag: String? = null
     ): ExaminerEvaluationReport {
-        val trimmed = studentSteps.trim()
-        if (trimmed.isBlank()) {
+        val total = maxMarks.coerceAtLeast(0).toDouble()
+        val student = studentSteps.trim()
+        if (student.isBlank()) {
             return ExaminerEvaluationReport(
-                marksAwarded = 0.0,
-                maxMarks = maxMarks.toDouble(),
-                stepChecks = listOf(
-                    AnswerStepCheck("Submission", maxMarks.toDouble(), 0.0, "No steps written yet.")
-                ),
-                missingSteps = listOf("Write Given, Formula, Substitution, Steps, and Final Answer."),
-                detectedWeakConcept = conceptTag,
-                summaryFeedback = "Start by writing the 'Given' data and the exact formula for partial marks."
+                0.0, total,
+                listOf(AnswerStepCheck("No answer submitted", total, 0.0, "Write your solution to receive rubric feedback.")),
+                listOf("No student working submitted."),
+                conceptTag,
+                "No marks awarded because no answer was submitted."
+            )
+        }
+        if (markingPoints.isEmpty() || total <= 0.0) {
+            return ExaminerEvaluationReport(
+                0.0, total,
+                listOf(AnswerStepCheck("Manual review required", total, 0.0, "No usable question-specific marking rubric is available.")),
+                listOf("Question-specific marking rubric missing."),
+                conceptTag,
+                "Automatic marking is unavailable for this question. Teacher review is required."
             )
         }
 
-        val lower = trimmed.lowercase()
-        val lines = trimmed.lines().map { it.trim() }.filter { it.isNotEmpty() }
-
-        // Pillar weights scaled cleanly to maxMarks
-        val hasGiven = lower.contains("given") || lower.contains("let ") ||
-            lines.any { it.contains("=") } || lower.contains("a =") || lower.contains("r =")
-        val hasFormula = lower.contains("formula") || lower.contains("=") ||
-            lower.contains("by ") || lower.contains("theorem") ||
-            lower.contains("sin") || lower.contains("cos") || lower.contains("tan") ||
-            lower.contains("π") || lower.contains("pi") || lower.contains("√") ||
-            lower.contains("Δ") || lower.contains("b²") || lower.contains("an =") ||
-            lower.contains("sn =")
-        val hasWorking = lines.size >= 2 || trimmed.length >= 28
-
-        val expectedNums = extractNumbers(officialAnswer)
-        val studentNums = extractNumbers(trimmed)
-        val finalAnswerMatched = if (expectedNums.isNotEmpty()) {
-            expectedNums.all { exp -> studentNums.any { abs(it - exp) <= 0.1 } }
-        } else {
-            val keyTokens = officialAnswer.lowercase()
-                .split(Regex("[^a-z0-9√π]+"))
-                .filter { it.length >= 2 }
-            keyTokens.isNotEmpty() && keyTokens.count { lower.contains(it) } >= (keyTokens.size / 2).coerceAtLeast(1)
+        val parsed = markingPoints.map { point ->
+            val weight = Regex("""\(?\s*(\d+(?:\.\d+)?)\s*M\s*\)?""", RegexOption.IGNORE_CASE)
+                .find(point)?.groupValues?.getOrNull(1)?.toDoubleOrNull()
+            point to weight
+        }
+        val explicitWeights = parsed.all { it.second != null } && parsed.sumOf { it.second ?: 0.0 } > 0.0
+        val rawWeights = if (explicitWeights) parsed.map { it.second!! } else List(parsed.size) { 1.0 }
+        val weightSum = rawWeights.sum().takeIf { it > 0.0 } ?: 1.0
+        val rubric = parsed.mapIndexed { index, (point, _) ->
+            RubricItem(point, total * rawWeights[index] / weightSum)
         }
 
-        val expectedUnits = extractExpectedUnit(officialAnswer)
-        val hasUnits = expectedUnits == null || lower.contains(expectedUnits.lowercase())
-
-        // Allocate marks proportionally across KSEAB pillars
-        val totalM = maxMarks.coerceAtLeast(1).toDouble()
-        val wGiven = (totalM * 0.2).coerceAtLeast(0.25)
-        val wFormula = (totalM * 0.25).coerceAtLeast(0.25)
-        val wWorking = (totalM * 0.25).coerceAtLeast(0.25)
-        val wAnswer = totalM - (wGiven + wFormula + wWorking)
-
+        val studentNumbers = extractNumbers(student)
+        val finalLine = student.lineSequence().lastOrNull { it.isNotBlank() }.orEmpty()
         val checks = mutableListOf<AnswerStepCheck>()
         val missing = mutableListOf<String>()
+        var awarded = 0.0
+        var manualReviewItems = 0
 
-        val gScore = if (hasGiven) wGiven else 0.0
-        checks += AnswerStepCheck(
-            "1. Given Data / Setup",
-            roundHalf(wGiven),
-            roundHalf(gScore),
-            if (hasGiven) "Given values identified cleanly." else "State given values explicitly (e.g., 'Given: r = ..., h = ...')."
-        )
-        if (!hasGiven) missing += "Explicit 'Given' values (-${MathVerificationEngine.fmt(roundHalf(wGiven))}M)"
-
-        val fScore = if (hasFormula) wFormula else 0.0
-        checks += AnswerStepCheck(
-            "2. Formula / Theorem Statement",
-            roundHalf(wFormula),
-            roundHalf(fScore),
-            if (hasFormula) "Formula / relation present." else "Name the exact formula or theorem before substituting."
-        )
-        if (!hasFormula) missing += "Formula / Theorem statement (-${MathVerificationEngine.fmt(roundHalf(wFormula))}M)"
-
-        val wScore = if (hasWorking) wWorking else 0.0
-        checks += AnswerStepCheck(
-            "3. Intermediate Substitution & Steps",
-            roundHalf(wWorking),
-            roundHalf(wScore),
-            if (hasWorking) "Step-by-step substitution shown." else "Show intermediate algebraic steps — never jump straight to an answer."
-        )
-        if (!hasWorking) missing += "Intermediate calculation steps (-${MathVerificationEngine.fmt(roundHalf(wWorking))}M)"
-
-        val aScore = when {
-            finalAnswerMatched && hasUnits -> wAnswer
-            finalAnswerMatched && !hasUnits -> (wAnswer - 0.5).coerceAtLeast(0.0)
-            else -> 0.0
+        rubric.forEachIndexed { index, item ->
+            val clean = item.text
+                .replace(Regex("""\(?\s*\d+(?:\.\d+)?\s*M\s*\)?""", RegexOption.IGNORE_CASE), "")
+                .replace(Regex("""[^\p{L}\p{N}./+−-]+"""), " ")
+                .trim()
+            val expectedNumbers = extractNumbers(clean)
+            val evidenceText = if (clean.contains("final answer", ignoreCase = true)) finalLine else student
+            val evidenceNumbers = if (clean.contains("final answer", ignoreCase = true)) extractNumbers(finalLine) else studentNumbers
+            val numericEvidence = expectedNumbers.isNotEmpty() &&
+                expectedNumbers.all { expected -> evidenceNumbers.any { abs(it - expected) < 0.0001 } }
+            val anchors = clean.lowercase()
+                .split(Regex("""[^a-z0-9]+"""))
+                .filter { it.length >= 4 && it !in STOP_WORDS }
+                .distinct()
+            val textualEvidence = anchors.size >= 2 &&
+                anchors.count { evidenceText.contains(it, ignoreCase = true) } >=
+                (anchors.size * 0.7).toInt().coerceAtLeast(2)
+            val verifiable = expectedNumbers.isNotEmpty() || anchors.size >= 2
+            val satisfied = verifiable && (numericEvidence || textualEvidence)
+            if (!verifiable) manualReviewItems++
+            val score = if (satisfied) item.marks else 0.0
+            awarded += score
+            checks += AnswerStepCheck(
+                "Rubric ${index + 1}",
+                roundHalf(item.marks),
+                roundHalf(score),
+                when {
+                    satisfied -> "Evidence for this question-specific marking point was found."
+                    !verifiable -> "This marking point cannot be reliably verified automatically; teacher review required."
+                    else -> "Required evidence for this marking point was not found."
+                }
+            )
+            if (!satisfied) missing += item.text
         }
-        val ansFeedback = when {
-            finalAnswerMatched && hasUnits -> "Matches official answer ($officialAnswer) with proper units."
-            finalAnswerMatched && !hasUnits -> "Numeric value matches, but missing unit '$expectedUnits' (-0.5M board penalty)."
-            else -> {
-                val signFlip = expectedNums.isNotEmpty() && expectedNums.any { exp -> studentNums.any { abs(it + exp) <= 0.1 } }
-                if (signFlip) "Sign error detected (+/- flip). Official answer: $officialAnswer."
-                else "Final answer does not match official key ($officialAnswer)."
+
+        val expectedFinal = extractNumbers(officialAnswer)
+        val finalMatch = if (expectedFinal.isNotEmpty()) {
+            MathVerificationEngine.verifyNumericAnswer(finalLine, expectedFinal).matched
+        } else null
+        val expectedUnit = extractExpectedUnit(officialAnswer)
+        val hasUnit = expectedUnit == null || finalLine.contains(expectedUnit, ignoreCase = true)
+        if (finalMatch == false) {
+            missing += "Final answer does not match numeric answer key: $officialAnswer"
+            val finalRubricIndex = rubric.indexOfLast {
+                val label = it.text.lowercase()
+                label.contains("final answer") || label.contains("final result") || label.contains("conclusion")
             }
+            if (finalRubricIndex >= 0) awarded = (awarded - rubric[finalRubricIndex].marks).coerceAtLeast(0.0)
         }
-        checks += AnswerStepCheck("4. Final Answer & Units", roundHalf(wAnswer), roundHalf(aScore), ansFeedback)
-        if (!finalAnswerMatched) missing += "Incorrect final answer (Expected: $officialAnswer)"
-        else if (!hasUnits) missing += "Missing final unit '$expectedUnits' (-0.5M)"
+        if (finalMatch == true && !hasUnit) missing += "Final answer unit '$expectedUnit' is missing."
+        checks += AnswerStepCheck(
+            "Final answer cross-check",
+            0.0,
+            0.0,
+            when {
+                finalMatch == null -> "Final answer requires manual comparison with the answer key."
+                !finalMatch -> "Numeric final-answer values do not match the answer key."
+                !hasUnit -> "Numeric values match, but the expected unit '$expectedUnit' is missing."
+                else -> "Numeric values match. Mathematical equivalence and unit correctness still require checking."
+            }
+        )
 
-        val awarded = roundHalf((gScore + fScore + wScore + aScore).coerceIn(0.0, totalM))
-        val weakConcept = if (awarded < totalM * 0.75) conceptTag else null
-
+        val finalAward = roundHalf(awarded.coerceIn(0.0, total))
         val summary = buildString {
-            append("Examiner Score: ${MathVerificationEngine.fmt(awarded)} / ${MathVerificationEngine.fmt(totalM)} Marks. ")
-            if (missing.isEmpty()) {
-                append("Full-mark KSEAB presentation!")
-            } else {
-                append("Marks lost due to: ${missing.joinToString("; ")}.")
-            }
+            append("Provisional rubric score: ${MathVerificationEngine.fmt(finalAward)} / ${MathVerificationEngine.fmt(total)}. ")
+            if (manualReviewItems > 0) append("$manualReviewItems rubric item(s) require teacher review. ")
+            append("This is an automated practice aid, not an official KSEAB evaluation.")
         }
-
         return ExaminerEvaluationReport(
-            marksAwarded = awarded,
-            maxMarks = totalM,
-            stepChecks = checks,
-            missingSteps = missing,
-            detectedWeakConcept = weakConcept,
-            summaryFeedback = summary
+            finalAward, total, checks, missing,
+            if (finalAward < total * 0.75) conceptTag else null,
+            summary
         )
     }
 
-    private fun extractNumbers(text: String): List<Double> {
-        val cleaned = text.replace("=", " ").replace(",", " ")
-        return Regex("-?\\d+(?:\\.\\d+)?(?:/\\d+(?:\\.\\d+)?)?")
-            .findAll(cleaned)
+    private fun extractNumbers(text: String): List<Double> =
+        Regex("""-?\d+(?:\.\d+)?(?:/\d+(?:\.\d+)?)?""")
+            .findAll(text.replace(",", " "))
             .mapNotNull { match ->
-                val raw = match.value
-                if (raw.contains("/")) {
-                    val parts = raw.split("/")
-                    val n = parts.getOrNull(0)?.toDoubleOrNull()
-                    val d = parts.getOrNull(1)?.toDoubleOrNull()
-                    if (n != null && d != null && abs(d) > 1e-9) n / d else null
-                } else {
-                    raw.toDoubleOrNull()
+                val parts = match.value.split("/")
+                val numerator = parts[0].toDoubleOrNull() ?: return@mapNotNull null
+                if (parts.size == 1) numerator else {
+                    val denominator = parts[1].toDoubleOrNull() ?: return@mapNotNull null
+                    if (abs(denominator) < 1e-9) null else numerator / denominator
                 }
             }.toList()
-    }
 
-    private fun extractExpectedUnit(officialAnswer: String): String? {
-        val lower = officialAnswer.lowercase()
+    private fun extractExpectedUnit(answer: String): String? {
+        val lower = answer.lowercase()
         return when {
             lower.contains("cm³") || lower.contains("cm^3") -> "cm³"
             lower.contains("cm²") || lower.contains("cm^2") -> "cm²"
@@ -167,5 +162,6 @@ object IndependentMarkingEngine {
         }
     }
 
-    private fun roundHalf(v: Double): Double = kotlin.math.round(v * 2.0) / 2.0
+    private fun roundHalf(value: Double): Double = round(value * 2.0) / 2.0
+    private val STOP_WORDS = setOf("that", "this", "with", "from", "then", "when", "find", "using", "given", "show", "prove", "hence", "equal", "each", "same", "step")
 }

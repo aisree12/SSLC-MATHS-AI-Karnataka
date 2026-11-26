@@ -118,7 +118,7 @@ interface StudyProgressDao {
         TopicVerificationEntity::class,
         ConceptStatEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -136,6 +136,51 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3: Migration = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Preserve all original chapter-tagged student records before changing IDs.
+                db.execSQL("CREATE TABLE IF NOT EXISTS legacy_chapter_progress_v2 AS SELECT * FROM chapter_progress")
+                db.execSQL("CREATE TABLE IF NOT EXISTS legacy_daily_goals_v2 AS SELECT * FROM daily_goals")
+                db.execSQL("CREATE TABLE IF NOT EXISTS legacy_topic_verification_v2 AS SELECT * FROM topic_verification")
+                db.execSQL("CREATE TABLE IF NOT EXISTS legacy_concept_stats_v2 AS SELECT * FROM concept_stats")
+
+                // Remove only legacy Constructions rows before the ID 2 -> official Chapter 6 mapping.
+                db.execSQL("DELETE FROM chapter_progress WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM daily_goals WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM topic_verification WHERE chapterNumber = 6")
+                db.execSQL("DELETE FROM concept_stats WHERE chapterNumber = 6")
+
+                val mappedIds = "1,2,3,4,5,7,8,9,10,11,12,13,14,15"
+                val mapping = "CASE chapterNumber " +
+                    "WHEN 1 THEN 5 WHEN 2 THEN 6 WHEN 3 THEN 3 WHEN 4 THEN 10 " +
+                    "WHEN 5 THEN 11 WHEN 7 THEN 7 WHEN 8 THEN 1 WHEN 9 THEN 2 " +
+                    "WHEN 10 THEN 4 WHEN 11 THEN 8 WHEN 12 THEN 9 WHEN 13 THEN 13 " +
+                    "WHEN 14 THEN 14 WHEN 15 THEN 12 ELSE chapterNumber END"
+                db.execSQL("UPDATE chapter_progress SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
+                db.execSQL("UPDATE daily_goals SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
+                db.execSQL("UPDATE topic_verification SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
+                val topicPrefixMap = "CASE " +
+                    "WHEN topicNumber GLOB '1.*' THEN '5' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '2.*' THEN '6' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '3.*' THEN '3' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '4.*' THEN '10' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '5.*' THEN '11' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '7.*' THEN '7' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '8.*' THEN '1' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '9.*' THEN '2' || substr(topicNumber, 2) " +
+                    "WHEN topicNumber GLOB '10.*' THEN '4' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '11.*' THEN '8' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '12.*' THEN '9' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '13.*' THEN '13' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '14.*' THEN '14' || substr(topicNumber, 3) " +
+                    "WHEN topicNumber GLOB '15.*' THEN '12' || substr(topicNumber, 3) " +
+                    "ELSE topicNumber END"
+                db.execSQL("UPDATE topic_verification SET topicNumber = $topicPrefixMap WHERE topicNumber GLOB '1.*' OR topicNumber GLOB '2.*' OR topicNumber GLOB '3.*' OR topicNumber GLOB '4.*' OR topicNumber GLOB '5.*' OR topicNumber GLOB '7.*' OR topicNumber GLOB '8.*' OR topicNumber GLOB '9.*' OR topicNumber GLOB '10.*' OR topicNumber GLOB '11.*' OR topicNumber GLOB '12.*' OR topicNumber GLOB '13.*' OR topicNumber GLOB '14.*' OR topicNumber GLOB '15.*'")
+                db.execSQL("UPDATE concept_stats SET chapterNumber = $mapping WHERE chapterNumber IN ($mappedIds)")
+
+            }
+        }
+
         @Volatile
         private var INSTANCE: AppDatabase? = null
 
@@ -146,7 +191,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "sslc_maths_ksmke.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { INSTANCE = it }
             }
@@ -237,7 +282,7 @@ class LocalProgressRepository(private val dao: StudyProgressDao) {
             DailyGoalEntity(
                 goalId = "goal_ch10_quad",
                 title = "Solve 3 Quadratic Formula problems with full 5-step working",
-                chapterNumber = 10,
+                chapterNumber = 4,
                 targetMinutes = 25,
                 completed = false,
                 scheduledSlot = "Morning • High Focus"
@@ -245,7 +290,7 @@ class LocalProgressRepository(private val dao: StudyProgressDao) {
             DailyGoalEntity(
                 goalId = "goal_ch2_bpt",
                 title = "Revise Thales (BPT) Theorem statement, figure & proof steps",
-                chapterNumber = 2,
+                chapterNumber = 6,
                 targetMinutes = 20,
                 completed = false,
                 scheduledSlot = "Afternoon • Geometry"
@@ -253,7 +298,7 @@ class LocalProgressRepository(private val dao: StudyProgressDao) {
             DailyGoalEntity(
                 goalId = "goal_ch11_trig",
                 title = "Practise 5 Trigonometry identity & value-table questions",
-                chapterNumber = 11,
+                chapterNumber = 8,
                 targetMinutes = 20,
                 completed = false,
                 scheduledSlot = "Evening • Revision"

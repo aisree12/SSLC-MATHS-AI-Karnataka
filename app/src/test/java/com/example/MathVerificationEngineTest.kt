@@ -4,6 +4,7 @@ import com.example.data.ksmke.AiTeachingLibrary
 import com.example.data.ksmke.AuditStepStatus
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.ksmke.OfficialSourceLibrary
+import com.example.data.ksmke.OfficialSyllabus2026_27
 import com.example.data.ksmke.PyqAnalyticsEngine
 import com.example.data.ksmke.TextbookCoverageAuditEngine
 import com.example.data.local.ConceptStatEntity
@@ -14,6 +15,7 @@ import com.example.domain.MasteryStatus
 import com.example.domain.MathVerificationEngine
 import com.example.domain.OpenWeightModelCatalog
 import com.example.domain.OpenWeightProvider
+import com.example.domain.QuestionSource
 import com.example.domain.WeaknessAndPlannerEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,17 +63,30 @@ class MathVerificationEngineTest {
     }
 
     @Test
-    fun ksmkeSyllabus_hasAll15ChaptersAnd80MarkExamPaper() {
-        assertEquals(15, KsmkeSyllabusRepository.chapters.size)
+    fun officialSyllabus_hasFourteenChaptersAndDistinctLegacyMappings() {
+        assertEquals(14, OfficialSyllabus2026_27.chapters.size)
+        assertEquals(5, OfficialSyllabus2026_27.officialIdForLegacy(1))
+        assertEquals(6, OfficialSyllabus2026_27.officialIdForLegacy(2))
+        assertEquals(null, OfficialSyllabus2026_27.officialIdForLegacy(6))
+        assertEquals("1–9", OfficialSyllabus2026_27.chapter(1)?.englishPrintedPages)
+        assertEquals("1–11", OfficialSyllabus2026_27.chapter(1)?.kannadaPrintedPages)
+        assertEquals("21–31", OfficialSyllabus2026_27.chapter(9)?.englishPrintedPages)
+        assertEquals("22–32", OfficialSyllabus2026_27.chapter(9)?.kannadaPrintedPages)
+    }
+
+    @Test
+    fun ksmkeSyllabus_hasOfficial14ChaptersAnd80MarkExamPaper() {
+        assertEquals(14, KsmkeSyllabusRepository.chapters.size)
+        assertEquals((1..14).toList(), KsmkeSyllabusRepository.chapters.map { it.chapterNumber })
         val fullPaper = KsmkeSyllabusRepository.buildExamPaper(ExamMode.FULL_BOARD_80)
         assertEquals(38, fullPaper.size)
         assertEquals(80, fullPaper.sumOf { it.marks })
     }
 
     @Test
-    fun ksmkeDetailedTopicsAndChapterPapers_coverAll15ChaptersAndSourceMapping() {
+    fun ksmkeDetailedTopicsAndChapterPapers_coverOfficialChaptersAndSourceMapping() {
         KsmkeSyllabusRepository.chapters.forEach { ch ->
-            assertTrue("Chapter ${ch.chapterNumber} missing detailedTopics", ch.detailedTopics.isNotEmpty())
+            assertNotNull("Chapter ${ch.chapterNumber} missing official syllabus entry", OfficialSyllabus2026_27.chapter(ch.chapterNumber))
             ch.detailedTopics.forEach { topic ->
                 assertTrue(topic.coreConcepts.isNotEmpty())
                 assertTrue(topic.formulasAndRules.isNotEmpty())
@@ -94,12 +109,19 @@ class MathVerificationEngineTest {
     fun dualLibraryAndExpandedPyqArchive_computeRealRecurrenceStats() {
         assertTrue(OfficialSourceLibrary.officialDocuments.size >= 5)
         assertEquals(6, AiTeachingLibrary.sixLayerEngine.size)
-        assertTrue(AiTeachingLibrary.buildIndexedCatalog().size >= 29)
+        val indexedCatalog = AiTeachingLibrary.buildIndexedCatalog()
+        val syllabusTopicCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
+        assertTrue("Indexed concept catalog should not be empty", indexedCatalog.isNotEmpty())
+        assertEquals("Every syllabus topic should have exactly one indexed concept", syllabusTopicCount, indexedCatalog.size)
 
-        assertTrue("Expected >= 60 PYQ entries, got ${KsmkeSyllabusRepository.pyqQuestions.size}", KsmkeSyllabusRepository.pyqQuestions.size >= 60)
+        assertTrue("Expected >= 60 PYQs across active and archived legacy records", KsmkeSyllabusRepository.pyqQuestions.size + KsmkeSyllabusRepository.legacyConstructionPyqs.size >= 60)
         val stats = PyqAnalyticsEngine.computeRecurrenceStats(KsmkeSyllabusRepository.pyqQuestions)
         assertTrue(stats.isNotEmpty())
-        assertTrue(stats.first().occurrences >= 2)
+        val expectedOfficialCount = KsmkeSyllabusRepository.pyqQuestions.count {
+            it.source == QuestionSource.HISTORICAL_BOARD || it.source == QuestionSource.OFFICIAL_MODEL_PAPER
+        }
+        assertEquals(expectedOfficialCount, stats.sumOf { it.occurrences })
+        assertTrue(stats.all { it.occurrences > 0 })
     }
 
     @Test
@@ -107,7 +129,12 @@ class MathVerificationEngineTest {
         val full = IndependentMarkingEngine.evaluateWrittenSolution(
             questionEn = "Find the distance between (2, 3) and (4, 1)",
             officialAnswer = "2.83 units",
-            markingPoints = listOf("Formula", "Substitute", "Answer"),
+            markingPoints = listOf(
+                "Given coordinates 2, 3, 4, 1 (0.5M)",
+                "Distance formula sqrt (0.5M)",
+                "Substitute coordinate values 2, 3, 4, 1 (0.5M)",
+                "Final answer 2.83 units (0.5M)"
+            ),
             maxMarks = 2,
             studentSteps = "Given: (2, 3) and (4, 1)\nFormula: d = sqrt((x2-x1)^2+(y2-y1)^2)\nStep: d = sqrt(8) = 2.83 units",
             conceptTag = "Distance Formula"
@@ -132,7 +159,7 @@ class MathVerificationEngineTest {
         val stats = listOf(
             ConceptStatEntity(
                 conceptTag = "Discriminant & Nature of Roots",
-                chapterNumber = 10,
+                chapterNumber = 4,
                 attempts = 4,
                 errors = 3,
                 confidenceRating = 2,
@@ -147,12 +174,12 @@ class MathVerificationEngineTest {
         val plan = WeaknessAndPlannerEngine.buildAutomaticStudyPlan(
             daysUntilExam = 15,
             dailyStudyMinutes = 120,
-            masteryByChapter = mapOf(10 to MasteryStatus.NEEDS_FOUNDATION),
+            masteryByChapter = mapOf(4 to MasteryStatus.NEEDS_FOUNDATION),
             chapterProgressList = emptyList(),
             weaknesses = insights
         )
         assertEquals(4, plan.size)
-        assertNotNull(plan.firstOrNull { it.chapterNumber == 10 })
+        assertNotNull(plan.firstOrNull { it.chapterNumber == 4 })
         assertEquals(120, plan.sumOf { it.dailyMinutes })
     }
 
@@ -170,7 +197,9 @@ class MathVerificationEngineTest {
         val geminiModels = OpenWeightModelCatalog.modelsFor(OpenWeightProvider.GEMINI)
         assertTrue(geminiModels.any { it.id == "gemini-3.8-flash" && it.supportsVision })
         assertTrue(geminiModels.any { it.id == "gemini-3.5-flash-lite" && it.supportsVision })
-        assertTrue(geminiModels.any { it.id == "gemini-4-argon" && it.supportsVision })
+        assertFalse(geminiModels.any { it.id == "gemini-4-argon" })
+        assertTrue(OpenWeightProvider.GEMINI_API_KEY.requiresApiKey)
+        assertEquals(listOf("gemini-3.8-flash", "gemini-3.5-flash-lite"), OpenWeightModelCatalog.modelsFor(OpenWeightProvider.GEMINI_API_KEY).map { it.id })
 
         assertTrue(OpenWeightProvider.ON_DEVICE_OFFLINE.runsOnPhoneHardware)
         assertFalse(OpenWeightProvider.ON_DEVICE_OFFLINE.requiresApiKey)
@@ -183,7 +212,7 @@ class MathVerificationEngineTest {
         assertEquals(6, audit.size)
         val ch2 = KsmkeSyllabusRepository.getChapter(2)
         val ch4 = KsmkeSyllabusRepository.getChapter(4)
-        assertEquals(5, ch2.theorems.size + ch4.theorems.size)
+        assertEquals(5, KsmkeSyllabusRepository.getChapter(6).theorems.size + KsmkeSyllabusRepository.getChapter(10).theorems.size)
 
         val jsonSlice = OpenWeightAiClient.extractJsonString(
             "<think>reasoning steps</think>\n```json\n{\"questions\": [{\"marks\": 2}]}\n```"
@@ -192,17 +221,18 @@ class MathVerificationEngineTest {
     }
 
     @Test
-    fun textbookCoverageAudit_passesAll7StepsAcrossPages1To342AndVerifiesMath() {
+    fun textbookCoverageAudit_reportsUnverifiedSourceCoverageAndLimitedMathChecks() {
         val report = TextbookCoverageAuditEngine.runFullAudit()
-        assertEquals(342, report.totalPagesExpected)
-        assertEquals(342, report.pagesCoveredCount)
-        assertTrue(report.continuousPageCoveragePassed)
+        assertEquals(0, report.totalPagesExpected)
+        assertEquals(0, report.pagesCoveredCount)
+        assertFalse(report.continuousPageCoveragePassed)
         assertEquals(7, report.sevenSteps.size)
-        assertTrue(report.sevenSteps.all { it.status == AuditStepStatus.PASSED })
-        assertEquals(15, report.chapterReports.size)
-        assertTrue(report.chapterReports.all { it.status == AuditStepStatus.PASSED })
+        assertTrue(report.sevenSteps.take(6).all { it.status == AuditStepStatus.ACTION_REQUIRED })
+        assertEquals(AuditStepStatus.PASSED, report.sevenSteps.last().status)
+        assertEquals(14, report.chapterReports.size)
+        assertTrue(report.chapterReports.all { it.status == AuditStepStatus.ACTION_REQUIRED })
         assertTrue(report.mathChecks.size >= 10)
         assertTrue(report.mathChecks.all { it.passed })
-        assertTrue(report.allPassed)
+        assertFalse(report.allPassed)
     }
 }

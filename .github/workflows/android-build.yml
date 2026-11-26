@@ -1,0 +1,76 @@
+name: Android build and unit tests
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+
+      - name: Install Gradle 9.3.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Load optional Gemini key from GitHub Actions secret
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            printf 'GEMINI_API_KEY=%s\n' "$GEMINI_API_KEY" > .env
+          fi
+
+      - name: Configure stable debug signing keystore
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          DEBUG_STORE_PASSWORD: ${{ secrets.DEBUG_STORE_PASSWORD }}
+          DEBUG_KEY_ALIAS: ${{ secrets.DEBUG_KEY_ALIAS }}
+          DEBUG_KEY_PASSWORD: ${{ secrets.DEBUG_KEY_PASSWORD }}
+        run: |
+          if [ -n "$ANDROID_DEBUG_KEYSTORE_BASE64" ]; then
+            if [ -z "$DEBUG_STORE_PASSWORD" ] || [ -z "$DEBUG_KEY_ALIAS" ] || [ -z "$DEBUG_KEY_PASSWORD" ]; then
+              echo "::error::All debug signing secrets must be configured together."
+              exit 1
+            fi
+            printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode > debug.keystore
+            echo "DEBUG_KEYSTORE_PATH=$GITHUB_WORKSPACE/debug.keystore" >> "$GITHUB_ENV"
+            echo "DEBUG_STORE_PASSWORD=$DEBUG_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "DEBUG_KEY_ALIAS=$DEBUG_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "DEBUG_KEY_PASSWORD=$DEBUG_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "Using the persistent debug signing keystore from GitHub Actions secrets."
+          else
+            echo "::warning::Persistent signing secrets are not configured; this build will use a temporary debug key and its SHA-1 will change."
+            keytool -genkeypair -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -dname 'CN=Android Debug,O=Android,C=US' -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
+      - name: Run unit tests and assemble debug APK
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sslc-maths-ai-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

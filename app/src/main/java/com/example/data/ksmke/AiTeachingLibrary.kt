@@ -43,7 +43,6 @@ object AiTeachingLibrary {
     fun buildIndexedCatalog(): List<IndexedConceptNode> {
         return KsmkeSyllabusRepository.chapters.flatMap { ch ->
             ch.detailedTopics.map { topic ->
-                val src = OfficialSourceLibrary.topicSourceIndex[topic.topicNumber]
                 val diff = when (ch.boardMarksWeightage) {
                     in 7..10 -> "High-Weightage Core"
                     in 5..6 -> "Standard Board Tier"
@@ -53,7 +52,7 @@ object AiTeachingLibrary {
                     topicNumber = topic.topicNumber,
                     chapterNumber = ch.chapterNumber,
                     conceptTitle = topic.topicTitleEn,
-                    pageRef = src?.sourcePageRef ?: ch.pageRange,
+                    pageRef = topic.sourcePageRef.ifBlank { ch.pageRange },
                     difficultyBand = diff,
                     recommendedTeachingHook = topic.coreConcepts.firstOrNull().orEmpty()
                 )

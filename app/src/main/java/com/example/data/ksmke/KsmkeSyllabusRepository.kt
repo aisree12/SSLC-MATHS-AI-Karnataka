@@ -12,24 +12,26 @@ import com.example.domain.TopicDetailedNote
 
 /**
  * Karnataka SSLC Mathematics Knowledge Engine (KSMKE)
- * Complete 15-chapter KSEAB Class 10 syllabus + verified 2015-2026+ PYQ & Model Paper bank.
+ * Legacy curated content is retained internally; public chapter IDs follow the official 14-chapter 2026–27 structure.
  */
 object KsmkeSyllabusRepository {
 
-    private fun detailedTopicsFor(chapterNumber: Int): List<TopicDetailedNote> =
-        (KsmkeDetailedNotesPart1.byChapter[chapterNumber]
+    private fun detailedTopicsFor(chapterNumber: Int): List<TopicDetailedNote> {
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(chapterNumber)
+        val official = officialId?.let { OfficialSyllabus2026_27.chapter(it) }
+        return (KsmkeDetailedNotesPart1.byChapter[chapterNumber]
             ?: KsmkeDetailedNotesPart2.byChapter[chapterNumber])
             .orEmpty()
             .map { note ->
-                val src = OfficialSourceLibrary.topicSourceIndex[note.topicNumber]
-                if (src != null) {
-                    note.copy(
-                        sourcePageRef = src.sourcePageRef,
-                        exerciseRef = src.exerciseRef,
-                        dikshaModuleTitle = src.dikshaModuleTitle
-                    )
-                } else note
+                note.copy(
+                    sourcePageRef = official?.let {
+                        "Chapter-level index only: English pp. ${it.englishPrintedPages}; Kannada pp. ${it.kannadaPrintedPages}. Topic page not verified."
+                    } ?: "Legacy topic reference; official source page pending.",
+                    exerciseRef = "Legacy exercise reference; official exercise mapping pending source comparison.",
+                    dikshaModuleTitle = "DIKSHA resource mapping pending verification"
+                )
             }
+    }
 
     private fun enrichChapter(ch: KsmkeChapter): KsmkeChapter {
         val supp = KsmkeSupplementLibrary.byChapter[ch.chapterNumber]
@@ -40,7 +42,7 @@ object KsmkeSyllabusRepository {
         )
     }
 
-    val chapters: List<KsmkeChapter> = listOf(
+    private val legacyChapters: List<KsmkeChapter> = listOf(
         KsmkeChapter(
             chapterNumber = 1,
             titleEn = "Arithmetic Progressions",
@@ -649,7 +651,30 @@ object KsmkeSyllabusRepository {
         )
     ).map { enrichChapter(it) }
 
-    val pyqQuestions: List<PyqQuestion> = listOf(
+    /** Legacy Constructions content is retained, but is not presented as an official numbered chapter. */
+    val legacyConstructionsContent: KsmkeChapter? =
+        legacyChapters.firstOrNull { it.chapterNumber == 6 }
+
+    val chapters: List<KsmkeChapter> = legacyChapters.mapNotNull { legacy ->
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(legacy.chapterNumber) ?: return@mapNotNull null
+        val official = OfficialSyllabus2026_27.chapter(officialId) ?: return@mapNotNull null
+        legacy.copy(
+            chapterNumber = official.number,
+            titleEn = official.titleEn,
+            titleKn = official.titleKn,
+            textbookEdition = OfficialSyllabus2026_27.edition,
+            pageRange = "English pp. ${official.englishPrintedPages}; Kannada pp. ${official.kannadaPrintedPages}",
+            detailedTopics = legacy.detailedTopics.map { topic ->
+                topic.copy(
+                    topicNumber = "${official.number}.${topic.topicNumber.substringAfter('.', topic.topicNumber)}",
+                    sourcePageRef = "Legacy page reference; official 2026–27 source page not yet verified.",
+                    exerciseRef = "Legacy exercise reference; official exercise mapping not yet verified."
+                )
+            }
+        )
+    }.sortedBy { it.chapterNumber }
+
+    private val legacyPyqQuestions: List<PyqQuestion> = (listOf(
         // 1-Mark MCQs (2026-27 MQP-01 & 2019–2025 Board)
         PyqQuestion(
             id = "pyq_2026_mqp_01",
@@ -1205,7 +1230,15 @@ object KsmkeSyllabusRepository {
         )
     ).map { q ->
         q.copy(conceptTag = q.conceptTag.ifBlank { canonicalConceptTagFor(q) })
-    } + PyqArchivePart1.questions + PyqArchivePart2.questions
+    } + PyqArchivePart1.questions + PyqArchivePart2.questions)
+
+    val legacyConstructionPyqs: List<PyqQuestion> = legacyPyqQuestions.filter { it.chapterNumber == 6 }
+
+    val pyqQuestions: List<PyqQuestion> = legacyPyqQuestions.mapNotNull { q ->
+        val officialId = OfficialSyllabus2026_27.officialIdForLegacy(q.chapterNumber)
+            ?: return@mapNotNull null
+        q.copy(chapterNumber = officialId)
+    }
 
     private fun canonicalConceptTagFor(q: PyqQuestion): String = when {
         q.chapterNumber == 1 && (q.questionEn.contains("sum", true) || q.questionEn.contains("S₁₀", true)) -> "AP Sum of n Terms (Sn)"

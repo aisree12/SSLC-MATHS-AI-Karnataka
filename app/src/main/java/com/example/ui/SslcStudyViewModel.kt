@@ -135,6 +135,9 @@ class SslcStudyViewModel(
     val isOpenAiKeyConfigured: Boolean
         get() = aiTeacher.isApiKeyConfigured()
 
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean =
+        aiTeacher.isProviderApiKeyConfigured(provider)
+
     private val _chatTurns = MutableStateFlow(
         listOf(
             ChatTurn(
@@ -420,7 +423,7 @@ class SslcStudyViewModel(
 
         viewModelScope.launch {
             try {
-                aiTeacher.streamTutorReply(
+                aiTeacher.streamTutorReplyWithFallback(
                     studentMessage = trimmed,
                     chapterNumber = _activeChapter.value,
                     language = _language.value,

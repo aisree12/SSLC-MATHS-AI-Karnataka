@@ -137,7 +137,7 @@ fun KsmkeSyllabusScreen(
                         color = Color.White
                     )
                     Text(
-                        text = "Complete 342/342-Page KTBS Syllabus, Bilingual Definitions, Ex 1.1–15.4 Index, 5 Board Proofs & 7 Canvas Labs.",
+                        text = "Official 14-Chapter KTBS 2026–27 Index, Curated Bilingual Notes, Practice Questions & Interactive Math Labs. Page-by-page source audit remains pending.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFE2E8F0)
                     )
@@ -190,7 +190,7 @@ fun KsmkeSyllabusScreen(
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(
-                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Audit (pp. 1–342)",
+                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Source Audit (review pending)",
                                 color = Color.White
                             )
                         }
@@ -324,7 +324,7 @@ private fun DualLibraryArchitectureCard() {
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
-                text = "Audit Status: ${if (fullAudit.allPassed) "ALL 7 STEPS PASSED" else "NEEDS REVIEW"} • ${fullAudit.pagesCoveredCount}/${fullAudit.totalPagesExpected} pages covered • ${fullAudit.mathChecks.count { it.passed }}/${fullAudit.mathChecks.size} independent math checks verified.",
+                text = "Audit Status: ${if (fullAudit.allPassed) "ALL 7 STEPS PASSED" else "SOURCE REVIEW PENDING"} • Page-by-page coverage not yet audited (English/Kannada and Part 1/2 use separate pagination) • ${fullAudit.mathChecks.count { it.passed }}/${fullAudit.mathChecks.size} bundled math checks passed.",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (fullAudit.allPassed) EmeraldChalk else MaterialTheme.colorScheme.error
             )
@@ -384,9 +384,9 @@ private fun DualLibraryArchitectureCard() {
                     ) {
                         Text(
                             if (showChapterAuditRows) {
-                                "Hide Chapter-by-Chapter Missing-Content Report (15 Chapters)"
+                                "Hide Chapter-by-Chapter Missing-Content Report (14 Chapters)"
                             } else {
-                                "View Chapter-by-Chapter Missing-Content Report (Ch 1–15)"
+                                "View Chapter-by-Chapter Missing-Content Report (Ch 1–14)"
                             }
                         )
                     }
@@ -404,7 +404,7 @@ private fun DualLibraryArchitectureCard() {
                                         verticalArrangement = Arrangement.spacedBy(3.dp)
                                     ) {
                                         Text(
-                                            text = "Ch ${cr.chapterNumber}: ${cr.chapterTitleEn} (pp. ${cr.startPage}–${cr.endPage}) • ${cr.status.label}",
+                                            text = "Ch ${cr.chapterNumber}: ${cr.chapterTitleEn} (English pp. ${cr.startPage}–${cr.endPage}) • ${cr.status.label}",
                                             style = MaterialTheme.typography.labelLarge,
                                             color = if (cr.status == AuditStepStatus.PASSED) EmeraldChalk else MaterialTheme.colorScheme.error
                                         )
@@ -614,7 +614,7 @@ private fun ChapterCard(
                 ) {
                     HorizontalDivider()
                     val chapterAudit = OfficialSourceLibrary.auditChapter(chapter.chapterNumber)
-                    val supplement = KsmkeSupplementLibrary.byChapter[chapter.chapterNumber]
+                    val supplement = KsmkeSupplementLibrary.byOfficialChapter[chapter.chapterNumber]
                     Surface(
                         color = EmeraldChalk.copy(alpha = 0.10f),
                         shape = RoundedCornerShape(10.dp),

@@ -31,11 +31,12 @@ import java.util.concurrent.TimeUnit
 
 private const val TAG = "OpenWeightAiClient"
 private const val PLACEHOLDER_KEY = "MY_FREE_OPEN_AI_API_KEY"
+private const val PLACEHOLDER_GEMINI_KEY = "YOUR_GEMINI_API_KEY"
 private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
 /**
  * Unified AI Gateway supporting:
- * - Google Gemini (Firebase AI Logic with keyless App Check attestation: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-4-argon)
+ * - Google Gemini (Firebase AI Logic with keyless App Check attestation: gemini-3.8-flash, gemini-3.5-flash-lite)
  * - OpenRouter (:free), Groq, Hugging Face Router, Cerebras Free Tier, and Self-Hosted Ollama.
  */
 class OpenWeightAiClient {
@@ -64,9 +65,21 @@ class OpenWeightAiClient {
         }
     }
 
-    fun isApiKeyConfigured(): Boolean {
-        val key = BuildConfig.OPENAI_COMPAT_API_KEY.trim()
-        return key.isNotEmpty() && key != PLACEHOLDER_KEY
+    private fun isUsableKey(key: String, placeholder: String): Boolean =
+        key.isNotBlank() && key != placeholder
+
+    fun isApiKeyConfigured(): Boolean =
+        isUsableKey(BuildConfig.OPENAI_COMPAT_API_KEY.trim(), PLACEHOLDER_KEY) ||
+            isUsableKey(BuildConfig.GEMINI_API_KEY.trim(), PLACEHOLDER_GEMINI_KEY)
+
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean = when (provider) {
+        OpenWeightProvider.GEMINI_API_KEY -> isUsableKey(BuildConfig.GEMINI_API_KEY.trim(), PLACEHOLDER_GEMINI_KEY)
+        else -> isUsableKey(BuildConfig.OPENAI_COMPAT_API_KEY.trim(), PLACEHOLDER_KEY)
+    }
+
+    private fun apiKeyFor(provider: OpenWeightProvider): String = when (provider) {
+        OpenWeightProvider.GEMINI_API_KEY -> BuildConfig.GEMINI_API_KEY.trim()
+        else -> BuildConfig.OPENAI_COMPAT_API_KEY.trim()
     }
 
     fun streamChatCompletion(
@@ -343,11 +356,10 @@ class OpenWeightAiClient {
         if (provider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
             throw IllegalStateException("On-Device Offline AI runs locally via MediaPipe, not HTTP.")
         }
-        if (provider.requiresApiKey && !isApiKeyConfigured()) {
+        if (provider.requiresApiKey && !isProviderApiKeyConfigured(provider)) {
             throw IllegalStateException(
-                "Free API key missing for ${provider.displayName}. " +
-                    "Add a free OpenRouter/Groq/HuggingFace/Cerebras key to OPENAI_COMPAT_API_KEY in Secrets, " +
-                    "or select Google Gemini (Keyless Firebase AI) or On-Device AI from the AI Model menu."
+                "API key missing for ${provider.displayName}. Add GEMINI_API_KEY (Google AI Studio) or OPENAI_COMPAT_API_KEY (other compatible providers) to local Secrets. " +
+                    "Alternatively select Firebase Gemini or On-Device AI."
             )
         }
     }
@@ -358,7 +370,7 @@ class OpenWeightAiClient {
             .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
             .header("Content-Type", "application/json")
         if (provider.requiresApiKey) {
-            builder.header("Authorization", "Bearer ${BuildConfig.OPENAI_COMPAT_API_KEY.trim()}")
+            builder.header("Authorization", "Bearer ${apiKeyFor(provider)}")
         }
         if (provider == OpenWeightProvider.OPENROUTER_FREE) {
             builder.header("HTTP-Referer", "https://sslc-maths-ai.local")

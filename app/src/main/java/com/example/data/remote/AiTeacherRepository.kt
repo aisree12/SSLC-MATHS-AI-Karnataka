@@ -18,6 +18,8 @@ import com.example.domain.TeachingLanguage
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withTimeout
 
 private const val TAG = "AiTeacherRepo"
@@ -34,18 +36,21 @@ class AiTeacherRepository(
     private val onDeviceLlmEngine: OnDeviceLlmEngine? = null
 ) {
 
-    @Volatile
-    var activeProvider: OpenWeightProvider = OpenWeightProvider.OPENROUTER_FREE
+    fun isProviderApiKeyConfigured(provider: OpenWeightProvider): Boolean =
+        openWeightClient.isProviderApiKeyConfigured(provider)
 
     @Volatile
-    var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.OPENROUTER_FREE).id
+    var activeProvider: OpenWeightProvider = OpenWeightProvider.GEMINI_API_KEY
+
+    @Volatile
+    var activeModelId: String = OpenWeightModelCatalog.defaultTextModel(OpenWeightProvider.GEMINI_API_KEY).id
 
     fun isApiKeyConfigured(): Boolean = openWeightClient.isApiKeyConfigured()
 
-    private fun requireReadyOnDeviceModelFile(): java.io.File {
+    private fun requireReadyOnDeviceModelFile(modelId: String = activeModelId): java.io.File {
         val manager = onDeviceModelManager
             ?: throw IllegalStateException("On-device model manager is not initialized.")
-        val spec = OpenWeightModelCatalog.findOnDeviceSpec(activeModelId)
+        val spec = OpenWeightModelCatalog.findOnDeviceSpec(modelId)
         return manager.getReadyModelFile(spec.modelId)
             ?: throw IllegalStateException(
                 "${spec.displayName} (${spec.approxSizeLabel}) is not downloaded on this phone yet. " +
@@ -69,12 +74,61 @@ class AiTeacherRepository(
                 )
             }
         }
-        return withTimeout(60_000L) {
-            openWeightClient.completeChat(
-                provider = activeProvider,
-                modelId = activeModelId,
-                systemInstruction = systemInstruction,
-                userPrompt = userPrompt
+        return try {
+            withTimeout(60_000L) {
+                openWeightClient.completeChat(
+                    provider = activeProvider,
+                    modelId = activeModelId,
+                    systemInstruction = systemInstruction,
+                    userPrompt = userPrompt
+                )
+            }
+        } catch (e: TimeoutCancellationException) {
+            completeWithDownloadedLocalModel(systemInstruction, userPrompt, e)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            completeWithDownloadedLocalModel(systemInstruction, userPrompt, e)
+        }
+    }
+
+    private suspend fun completeWithDownloadedLocalModel(
+        systemInstruction: String,
+        userPrompt: String,
+        cloudError: Throwable
+    ): String {
+        val manager = onDeviceModelManager
+            ?: throw IllegalStateException(
+                "Cloud AI failed and no on-device model manager is available. Install a .task model or use the offline KSMKE lesson.",
+                cloudError
+            )
+        val engine = onDeviceLlmEngine
+            ?: throw IllegalStateException(
+                "Cloud AI failed and the on-device inference runtime is unavailable.",
+                cloudError
+            )
+        val readySpec = OpenWeightModelCatalog.onDeviceQuantizedModels.firstOrNull {
+            manager.getReadyModelFile(it.modelId) != null
+        } ?: throw IllegalStateException(
+            "Cloud AI failed (possibly free-tier quota). Download or import a quantised .task model to enable automatic offline AI.",
+            cloudError
+        )
+        val modelFile = manager.getReadyModelFile(readySpec.modelId)
+            ?: throw IllegalStateException("Downloaded on-device model is no longer available.", cloudError)
+        return try {
+            withTimeout(120_000L) {
+                engine.complete(
+                    modelFile = modelFile,
+                    systemInstruction = systemInstruction,
+                    userPrompt = userPrompt
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw IllegalStateException(
+                "Cloud AI and downloaded on-device AI both failed. The offline KSMKE guide remains available in Teacher Chat.",
+                e
             )
         }
     }
@@ -104,7 +158,8 @@ class AiTeacherRepository(
         studentMessage: String,
         chapterNumber: Int?,
         language: TeachingLanguage,
-        historySummary: String
+        historySummary: String,
+        forceLocalModelId: String? = null
     ): Flow<String> {
         val chapterContext = chapterNumber?.let {
             val ch = KsmkeSyllabusRepository.getChapter(it)
@@ -126,10 +181,10 @@ class AiTeacherRepository(
             appendLine("Student says: $studentMessage")
         }
 
-        if (activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
+        if (forceLocalModelId != null || activeProvider == OpenWeightProvider.ON_DEVICE_OFFLINE) {
             val engine = onDeviceLlmEngine
                 ?: throw IllegalStateException("On-device MediaPipe LLM runtime is not initialized.")
-            val modelFile = requireReadyOnDeviceModelFile()
+            val modelFile = requireReadyOnDeviceModelFile(forceLocalModelId ?: activeModelId)
             return engine.streamCompletion(
                 modelFile = modelFile,
                 systemInstruction = gurujiSystemPrompt,
@@ -145,6 +200,53 @@ class AiTeacherRepository(
         )
     }
 
+    /** Cloud-first teacher stream with automatic local-AI / structured-guide recovery. */
+    fun streamTutorReplyWithFallback(
+        studentMessage: String,
+        chapterNumber: Int?,
+        language: TeachingLanguage,
+        historySummary: String
+    ): Flow<String> = flow {
+        try {
+            streamTutorReply(studentMessage, chapterNumber, language, historySummary).collect { emit(it) }
+        } catch (e: TimeoutCancellationException) {
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, this)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            recoverTeacherReply(studentMessage, chapterNumber, language, historySummary, e, this)
+        }
+    }
+
+    private suspend fun recoverTeacherReply(
+        studentMessage: String,
+        chapterNumber: Int?,
+        language: TeachingLanguage,
+        historySummary: String,
+        cloudError: Throwable,
+        collector: FlowCollector<String>
+    ) {
+        val manager = onDeviceModelManager
+        val engine = onDeviceLlmEngine
+        val readySpec = OpenWeightModelCatalog.onDeviceQuantizedModels.firstOrNull { spec ->
+            manager?.getReadyModelFile(spec.modelId) != null
+        }
+        if (readySpec != null && engine != null) {
+            val notice = "Cloud AI unavailable (network/provider/free-tier quota). Switching to downloaded on-device AI.\n\n"
+            collector.emit(notice)
+            try {
+                streamTutorReply(studentMessage, chapterNumber, language, historySummary, readySpec.modelId)
+                    .collect { collector.emit(notice + it) }
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (localError: Exception) {
+                Log.w(TAG, "On-device fallback failed: " + localError.message, localError)
+            }
+        }
+        Log.w(TAG, "Using structured offline lesson after cloud failure: " + cloudError.message)
+        collector.emit(buildOfflineKsmkeResponse(studentMessage, chapterNumber, language))
+    }
     suspend fun evaluateAnswerPresentation(
         questionText: String,
         expectedAnswer: String,

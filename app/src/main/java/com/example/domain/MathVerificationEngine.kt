@@ -328,7 +328,7 @@ object MathVerificationEngine {
         val checks = mutableListOf<MathAuditCheckResult>()
 
         val ch1 = solveArithmeticProgression(3.0, 5.0, 20)
-        checks += MathAuditCheckResult(1, "Ch 1: 20th term & sum of AP 3, 8, 13...", "a20=98, S20=1010", ch1.finalAnswer,
+        checks += MathAuditCheckResult(5, "Ch 5: 20th term & sum of AP 3, 8, 13...", "a20=98, S20=1010", ch1.finalAnswer,
             abs(ch1.numericResults[0] - 98.0) < 1e-4 && abs(ch1.numericResults[1] - 1010.0) < 1e-4)
 
         val ch3 = solveLinearPair(1.0, 1.0, -14.0, 1.0, -1.0, -4.0)
@@ -336,11 +336,11 @@ object MathVerificationEngine {
             abs(ch3.numericResults[0] - 9.0) < 1e-4 && abs(ch3.numericResults[1] - 5.0) < 1e-4)
 
         val ch4 = solveCircleTangentLength(25.0, 7.0)
-        checks += MathAuditCheckResult(4, "Ch 4: Tangent length (OQ=25, r=7)", "24", ch4.finalAnswer,
+        checks += MathAuditCheckResult(10, "Ch 10: Tangent length (OQ=25, r=7)", "24", ch4.finalAnswer,
             abs(ch4.numericResults[0] - 24.0) < 1e-4)
 
         val ch5 = solveSectorAndSegment(10.0, 90.0, 3.14)
-        checks += MathAuditCheckResult(5, "Ch 5: Sector & minor segment (r=10, 90°)", "78.5 / 28.5", ch5.finalAnswer,
+        checks += MathAuditCheckResult(11, "Ch 11: Sector & minor segment (r=10, 90°)", "78.5 / 28.5", ch5.finalAnswer,
             abs(ch5.numericResults[1] - 78.5) < 0.05 && abs(ch5.numericResults[2] - 28.5) < 0.05)
 
         val ch7 = solveCoordinateGeometry(-1.0, 7.0, 4.0, -3.0, 2.0, 3.0)
@@ -348,15 +348,15 @@ object MathVerificationEngine {
             abs(ch7.numericResults[3] - 1.0) < 1e-4 && abs(ch7.numericResults[4] - 3.0) < 1e-4)
 
         val ch8 = solveEuclidHcfLcm(96, 404)
-        checks += MathAuditCheckResult(8, "Ch 8: Euclid HCF & LCM of 96 and 404", "HCF=4, LCM=9696", ch8.finalAnswer,
+        checks += MathAuditCheckResult(1, "Ch 1: Euclid HCF & LCM of 96 and 404", "HCF=4, LCM=9696", ch8.finalAnswer,
             abs(ch8.numericResults[0] - 4.0) < 1e-4 && abs(ch8.numericResults[1] - 9696.0) < 1e-4)
 
         val ch10 = solveQuadratic(2.0, -7.0, 3.0)
-        checks += MathAuditCheckResult(10, "Ch 10: Roots of 2x² - 7x + 3 = 0", "3, 0.5", ch10.finalAnswer,
+        checks += MathAuditCheckResult(4, "Ch 4: Roots of 2x² - 7x + 3 = 0", "3, 0.5", ch10.finalAnswer,
             abs(ch10.numericResults[0] - 3.0) < 1e-4 && abs(ch10.numericResults[1] - 0.5) < 1e-4)
 
         val ch12 = solveElevationHeight(30.0, 30)
-        checks += MathAuditCheckResult(12, "Ch 12: Tower height (30m base, 30°)", "10√3 ≈ 17.32", ch12.finalAnswer,
+        checks += MathAuditCheckResult(9, "Ch 9: Tower height (30m base, 30°)", "10√3 ≈ 17.32", ch12.finalAnswer,
             abs(ch12.numericResults[0] - 10.0 * sqrt(3.0)) < 0.05)
 
         val ch13 = solveGroupedDirectMean(listOf(5.0, 15.0, 25.0, 35.0, 45.0), listOf(3.0, 5.0, 9.0, 5.0, 3.0))
@@ -364,7 +364,7 @@ object MathVerificationEngine {
             abs(ch13.numericResults[0] - 25.0) < 1e-4)
 
         val ch15 = solveMensurationFrustum(2.0, 1.0, 14.0)
-        checks += MathAuditCheckResult(15, "Ch 15: Frustum drinking glass capacity (r1=2, r2=1, h=14)", "102.67", ch15.finalAnswer,
+        checks += MathAuditCheckResult(12, "Ch 12: Frustum drinking glass capacity (r1=2, r2=1, h=14)", "102.67", ch15.finalAnswer,
             abs(ch15.numericResults[0] - (308.0 / 3.0)) < 0.05)
 
         return checks

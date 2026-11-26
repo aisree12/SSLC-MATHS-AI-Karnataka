@@ -24,9 +24,9 @@ object OfficialSourceLibrary {
             title = "KTBS Class 10 Mathematics Part 1 (English Medium)",
             languageMedium = "English",
             editionOrYear = "KSEAB / KTBS Revised 2026-27",
-            chaptersCovered = "Chapters 1–7 (AP, Triangles, Linear Pairs, Circles, Areas Related to Circles, Constructions, Coordinate Geometry)",
+            chaptersCovered = "Official 2026–27 chapters 1–7: Real Numbers (pp. 1–9), Polynomials (10–23), Pair of Linear Equations in Two Variables (24–37), Quadratic Equations (38–47), Arithmetic Progressions (48–71), Triangles (72–96), Coordinate Geometry (98–111). English section headings and exercise IDs are indexed.",
             provenanceAndPermissionNote = "Reference index only (copyrighted full KTBS PDF pages are NOT bundled verbatim; app holds curated topic notes & proofs).",
-            verificationState = "Index + Curated Notes (Full Verbatim Corpus Pending)"
+            verificationState = "Chapter/Section Index + Exercise IDs (Full Source Audit Pending)"
         ),
         OfficialSourceRecord(
             id = "ktbs_math_part2_en",
@@ -34,7 +34,7 @@ object OfficialSourceLibrary {
             title = "KTBS Class 10 Mathematics Part 2 (English Medium)",
             languageMedium = "English",
             editionOrYear = "KSEAB / KTBS Revised 2026-27",
-            chaptersCovered = "Chapters 8–15 (Real Numbers, Polynomials, Quadratic Equations, Trigonometry, Heights & Distances, Statistics, Probability, Surface Areas & Volumes)",
+            chaptersCovered = "Official 2026–27 Part 2: Introduction to Trigonometry, Some Applications of Trigonometry, Circles, Areas Related to Circles, Surface Areas and Volumes, Statistics, Probability.",
             provenanceAndPermissionNote = "Reference index only (copyrighted full KTBS PDF pages are NOT bundled verbatim; app holds curated topic notes & formulas).",
             verificationState = "Index + Curated Notes (Full Verbatim Corpus Pending)"
         ),
@@ -44,9 +44,9 @@ object OfficialSourceLibrary {
             title = "KTBS 10ನೇ ತರಗತಿ ಗಣಿತ ಭಾಗ 1 & 2 (ಕನ್ನಡ ಮಾಧ್ಯಮ)",
             languageMedium = "Kannada (ಕನ್ನಡ)",
             editionOrYear = "KSEAB / KTBS Revised 2026-27",
-            chaptersCovered = "ಅಧ್ಯಾಯಗಳು 1–15 (ಶೀರ್ಷಿಕೆ, ಸಾರಾಂಶ ಮತ್ತು ಮುಖ್ಯ ಪ್ರಶ್ನೆಗಳು)",
-            provenanceAndPermissionNote = "Bilingual chapter/topic titles, theorem names, and 61+ PYQ prompts bundled; full Kannada exercise-by-exercise parity awaits KTBS corpus ingestion.",
-            verificationState = "Titles & PYQ Prompts Synced (Full KN Prose Partial)"
+            chaptersCovered = "All 14 Kannada chapter titles and printed page ranges are verified from the two Kannada contents pages; section-title and exercise-by-exercise parity remain pending.",
+            provenanceAndPermissionNote = "Kannada chapter titles and printed page ranges are indexed; exact Kannada section names, exercise numbering, examples, diagrams and full prose parity remain to be compared.",
+            verificationState = "Kannada Chapter Titles + Page Ranges Verified (Section/Exercise Parity Pending)"
         ),
         OfficialSourceRecord(
             id = "kseab_pyq_archive_2015_2026",
@@ -54,9 +54,9 @@ object OfficialSourceLibrary {
             title = "KSEAB SSLC Mathematics Papers & Official Key Answers (81E Series)",
             languageMedium = "English & Kannada",
             editionOrYear = "2015 – 2026 Main, Supplementary & Preparatory (Curated Subset)",
-            chaptersCovered = "All 15 Chapters • Subject Code 81E",
-            provenanceAndPermissionNote = "Public examination questions (61+ items across 2015–2026) and official marking-step rubrics used for recurrence statistics.",
-            verificationState = "Curated 61+ Item Bank (Not Full Decade Archive)"
+            chaptersCovered = "Legacy tagged questions are remapped to official chapter IDs; legacy Constructions-only prompts are retained in a separate archive.",
+            provenanceAndPermissionNote = "Curated question references and marking-step data are used for recurrence statistics; permission to redistribute source paper text is not established.",
+            verificationState = "Curated remapped item bank (not a full decade archive)"
         ),
         OfficialSourceRecord(
             id = "kseab_mqp_2026_27",
@@ -88,39 +88,39 @@ object OfficialSourceLibrary {
     val sixCriterionCorpusAudit: List<CorpusAuditCriterion> = listOf(
         CorpusAuditCriterion(
             id = "pages_in_corpus",
-            title = "1. All Textbook Pages Audited (pp. 1–342)",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "All 342/342 textbook pages across Chapters 1–15 are continuously mapped to curated notes, definitions, formulas, and exercises (copyrighted third-party KTBS scan PDFs remain external by license)."
+            title = "1. Printed textbook page coverage",
+            status = CorpusCriterionStatus.PENDING_EXTERNAL_CORPUS,
+            detail = "Not verified page-by-page. Existing page ranges and curated notes are indexes only; compare every printed page against the licensed English and Kannada source books before claiming coverage."
         ),
         CorpusAuditCriterion(
             id = "examples_exercises",
-            title = "2. Every Example & Exercise (Ex 1.1–Ex 15.4) Covered",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "44+ worked examples, 61+ PYQs, 15 chapterwise target papers, and KsmkeSupplementLibrary covering 40+ exercise sets (400+ subquestions Ex 1.1–Ex 15.4) are verified in-app."
+            title = "2. Textbook examples and exercises",
+            status = CorpusCriterionStatus.PARTIAL_CURATED,
+            detail = "Curated exercise references and sample worked examples exist. Completeness, exercise numbering, subquestion counts, and answer correctness have not been independently checked against all four books."
         ),
         CorpusAuditCriterion(
             id = "theorems_proofs",
-            title = "3. Every Theorem & Proof Included",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "Complete 5-step board proofs for Thales (BPT), AA Similarity & Area Ratio, Pythagoras Theorem, Tangent ⊥ Radius (Thm 4.1), and External Tangents Equal (Thm 4.2)."
+            title = "3. Theorems and proofs",
+            status = CorpusCriterionStatus.PARTIAL_CURATED,
+            detail = "Selected theorem notes and proof examples are present; full textbook proof inventory and exact section parity remain unverified."
         ),
         CorpusAuditCriterion(
             id = "diagrams_constructions",
-            title = "4. Every Diagram & Construction Represented",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "7 live Canvas labs (Linear Graphs, Parabolas, Thales BPT, Circle Tangents, Constructions, Trig Elevation, Frustum) + annotated schematic specs for all 15 chapters."
+            title = "4. Diagrams and constructions",
+            status = CorpusCriterionStatus.PARTIAL_CURATED,
+            detail = "Selected interactive labs and diagram specifications exist. No source-by-source check confirms every required textbook figure or construction."
         ),
         CorpusAuditCriterion(
             id = "en_kn_parity",
-            title = "5. English & Kannada 2026–27 Edition Match",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "English & Kannada chapter titles, topic titles, summaries, definitions, theorem names, and 61+ PYQ stems match KTBS Revised 2026–27."
+            title = "5. English and Kannada parity",
+            status = CorpusCriterionStatus.PENDING_EXTERNAL_CORPUS,
+            detail = "Non-empty bilingual fields do not establish translation fidelity. Kannada chapter titles, section names, examples, exercises, and mathematical terminology require direct comparison with the Kannada books."
         ),
         CorpusAuditCriterion(
             id = "editions_permissions",
-            title = "6. Source Edition, Permissions & Math Verification",
-            status = CorpusCriterionStatus.VERIFIED_IN_APP,
-            detail = "KTBS Revised 2026–27 refs, KSEAB 81E attribution, DIKSHA CC-BY-4.0 tags, and MathVerificationEngine independent answer checks all pass."
+            title = "6. Source edition, permissions and mathematical checks",
+            status = CorpusCriterionStatus.PARTIAL_CURATED,
+            detail = "Edition references are recorded. Redistribution permission is not established, and selected deterministic checks do not certify all worked answers or marking schemes."
         )
     )
 
@@ -134,7 +134,8 @@ object OfficialSourceLibrary {
      * Reference mapping of KTBS page ranges, exercise numbers, and DIKSHA tags by Topic Number.
      * Note: These are provenance pointers to textbook sections, NOT verbatim copyrighted PDF dumps.
      */
-    val topicSourceIndex: Map<String, TopicSourceMapping> = mapOf(
+    @Deprecated("Legacy source pointers are not valid for the 2026–27 official chapter sequence")
+    val legacyTopicSourceIndex: Map<String, TopicSourceMapping> = mapOf(
         "1.1" to TopicSourceMapping("KTBS Part 1, pp. 1–7", "Ex 1.1 (Q1–Q4)", "DIKSHA KA-10: Exploring AP Sequences"),
         "1.2" to TopicSourceMapping("KTBS Part 1, pp. 8–15", "Ex 1.2 (Q1–Q20)", "DIKSHA KA-10: nth Term of an AP"),
         "1.3" to TopicSourceMapping("KTBS Part 1, pp. 16–26", "Ex 1.3 (Q1–Q20), Ex 1.4", "DIKSHA KA-10: Sum of First n Terms (Sn)"),
@@ -168,15 +169,14 @@ object OfficialSourceLibrary {
 
     fun auditChapter(chapterNumber: Int): ChapterCorpusAudit {
         val ch = KsmkeSyllabusRepository.getChapter(chapterNumber)
-        val supp = KsmkeSupplementLibrary.byChapter[chapterNumber]
-        val exRefs = supp?.exercises?.joinToString(", ") { it.exerciseId }
-            ?: ch.detailedTopics.mapNotNull { topicSourceIndex[it.topicNumber]?.exerciseRef }.joinToString(", ")
-                .ifBlank { "Mapped in KTBS Index" }
-        val status = if (supp != null && ch.detailedTopics.isNotEmpty() && ch.solvedExamples.isNotEmpty()) {
-            SyllabusCertificationState.CERTIFIED_COMPLETE
+        val officialExerciseIds = OfficialSyllabus2026_27.chapter(chapterNumber)?.exerciseIds.orEmpty()
+        val exRefs = if (officialExerciseIds.isNotEmpty()) {
+            "English textbook exercise IDs: " + officialExerciseIds.joinToString(", ") { "Ex $it" } +
+                ". Kannada exercise-by-exercise parity pending."
         } else {
-            SyllabusCertificationState.PARTIAL_CURATED
+            "Official exercise IDs not yet verified."
         }
+        val status = SyllabusCertificationState.PARTIAL_CURATED
         return ChapterCorpusAudit(
             chapterNumber = ch.chapterNumber,
             ktbsPageRange = ch.pageRange,
@@ -184,7 +184,7 @@ object OfficialSourceLibrary {
             workedExamplesInApp = ch.solvedExamples.size + ch.detailedTopics.sumOf { it.workedExamples.size },
             theoremsInApp = ch.theorems.size,
             exerciseSetsIndexed = exRefs,
-            enKnParityNote = "EN+KN titles, summaries, definitions & key terms synced with KTBS 2026–27.",
+            enKnParityNote = "Chapter titles and printed page ranges are indexed from both contents pages; detailed translation fidelity has not been independently audited.",
             sourceEditionAndPermission = ch.textbookEdition,
             certificationState = status
         )
