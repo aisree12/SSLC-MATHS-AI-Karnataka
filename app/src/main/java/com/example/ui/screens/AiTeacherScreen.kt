@@ -378,13 +378,7 @@ fun AiTeacherScreen(
                 // Contextual status strip for On-Device AI weights, Ollama host, or missing API key
                 when {
                     selectedProvider == OpenWeightProvider.GEMINI_API_KEY -> Unit
-                    selectedProvider == OpenWeightProvider.GEMINI -> {
-                        Text(
-                            text = "Keyless Google Gemini powered by Firebase AI Logic + App Check (No API key needed). Supports Text + Camera Vision.",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = EmeraldChalk
-                        )
-                    }
+                    selectedProvider == OpenWeightProvider.GEMINI -> Unit
                     selectedProvider == OpenWeightProvider.ON_DEVICE_OFFLINE -> {
                         val onDeviceStatus = onDeviceStatuses[selectedModelId]
                             ?: OnDeviceModelStatus.NotDownloaded(OpenWeightModelCatalog.findOnDeviceSpec(selectedModelId))
