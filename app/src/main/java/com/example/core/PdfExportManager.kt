@@ -50,16 +50,28 @@ object PdfExportManager {
         val state = PageWriterState(doc)
 
         state.drawHeaderBanner(
-            title = "KSMKE Detailed Notes • Ch ${chapter.chapterNumber}: ${chapter.titleEn}",
+            title = "SSLC Maths Study Notes • Ch ${chapter.chapterNumber}: ${chapter.titleEn}",
             subtitle = "${chapter.titleKn} • ${chapter.textbookEdition} (${chapter.pageRange}) • Board Weightage: ${chapter.boardMarksWeightage} Marks"
         )
 
-        state.writeSectionHeading("Chapter Overview & Blueprint")
+        state.writeSectionHeading("Chapter Overview • ಅಧ್ಯಾಯದ ಪರಿಚಯ")
         state.writeBody(chapter.summaryEn)
         state.writeSubtle(chapter.summaryKn)
         state.addGap(8f)
 
-        state.writeSectionHeading("Complete Formula Sheet")
+        if (chapter.solvedExamples.isNotEmpty()) {
+            state.writeSectionHeading("Chapter Worked Examples • ಬಿಡಿಸಿದ ಉದಾಹರಣೆಗಳು")
+            chapter.solvedExamples.forEach { ex ->
+                state.writeSubHeading(ex.title)
+                state.writeBody("Question: ${ex.problem}")
+                ex.markingSteps.forEach { step -> state.writeMono(step) }
+                state.writeBold("Final Answer: ${ex.finalAnswer}")
+                state.writeSubtle("Exam Tip: ${ex.examinerTip}")
+                state.addGap(5f)
+            }
+        }
+
+        state.writeSectionHeading("Key Formulas • ಮುಖ್ಯ ಸೂತ್ರಗಳು")
         chapter.keyFormulas.forEach { formula ->
             state.writeMono("• $formula")
         }
@@ -111,8 +123,14 @@ object PdfExportManager {
             state.addGap(8f)
         }
 
+        if (chapter.commonMistakes.isNotEmpty()) {
+            state.writeSectionHeading("Quick Revision • Common Mistakes to Avoid")
+            chapter.commonMistakes.forEach { mistake -> state.writeBody("• $mistake") }
+            state.addGap(6f)
+        }
+
         if (!aiDeepDiveMarkdown.isNullOrBlank()) {
-            state.writeSectionHeading("AI Extended Topic-Wise Deep Notes")
+            state.writeSectionHeading("Extra Topic-Wise Explanations")
             aiDeepDiveMarkdown.lines().forEach { line ->
                 val clean = line.replace("**", "").replace("##", "").trim()
                 if (clean.isNotEmpty()) state.writeBody(clean)
@@ -121,7 +139,7 @@ object PdfExportManager {
 
         state.finish()
         val safeTitle = chapter.titleEn.replace(Regex("[^a-zA-Z0-9]+"), "_").trim('_')
-        val fileName = "SSLC_Ch${chapter.chapterNumber}_${safeTitle}_Detailed_Notes.pdf"
+        val fileName = "SSLC_Ch${chapter.chapterNumber}_${safeTitle}_Study_Notes.pdf"
         savePdfBytes(context, doc, fileName)
     }
 

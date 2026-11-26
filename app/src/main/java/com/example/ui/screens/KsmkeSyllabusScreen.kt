@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.ksmke.AiTeachingLibrary
 import com.example.data.ksmke.AuditStepStatus
-import com.example.data.ksmke.KsmkeSupplementLibrary
 import com.example.data.ksmke.KsmkeSyllabusRepository
 import com.example.data.ksmke.OfficialSourceLibrary
 import com.example.data.ksmke.TextbookCoverageAuditEngine
@@ -98,9 +97,6 @@ fun KsmkeSyllabusScreen(
     var showBlackboard by rememberSaveable { mutableStateOf(false) }
     var showDualLibrary by rememberSaveable { mutableStateOf(false) }
 
-    val totalTopicsCount = KsmkeSyllabusRepository.chapters.sumOf { it.detailedTopics.size }
-    val verifiedTopicsCount = topicVerifications.values.count { it == TopicCompletionStatus.VERIFIED_COMPLETE }
-
     val masteryMap: Map<Int, MasteryStatus> = when (val state = cloudState) {
         is CloudUiState.Success -> {
             val fromCloud = state.data.masteryByChapter.mapValues { it.value.safeStatus() }
@@ -115,6 +111,8 @@ fun KsmkeSyllabusScreen(
                 ?: MasteryStatus.NOT_STARTED)
         }
     }
+
+    val understoodChaptersCount = KsmkeSyllabusRepository.chapters.count { masteryMap[it.chapterNumber] == MasteryStatus.UNDERSTOOD }
 
     LazyColumn(
         contentPadding = PaddingValues(14.dp),
@@ -132,25 +130,24 @@ fun KsmkeSyllabusScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "KSMKE • 6-Layer Knowledge Engine",
+                        text = "SSLC Maths Study Centre",
                         style = MaterialTheme.typography.titleLarge,
                         color = Color.White
                     )
                     Text(
-                        text = "Official 14-Chapter KTBS 2026–27 Index, Curated Bilingual Notes, Practice Questions & Interactive Math Labs. Page-by-page source audit remains pending.",
+                        text = "ಕರ್ನಾಟಕ SSLC ಗಣಿತ • Learn, revise and practise one chapter at a time.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFFE2E8F0)
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "7-Step Textbook Audit: PASSED (342/342 pp.) • Topic Review: $verifiedTopicsCount / $totalTopicsCount",
+                            text = "Chapters understood: $understoodChaptersCount / ${KsmkeSyllabusRepository.chapters.size}",
                             style = MaterialTheme.typography.labelMedium,
                             color = SaffronGold
                         )
                         LinearProgressIndicator(
                             progress = {
-                                if (totalTopicsCount > 0) (verifiedTopicsCount.toFloat() / totalTopicsCount.toFloat()).coerceIn(0f, 1f)
-                                else 0f
+                                (understoodChaptersCount.toFloat() / KsmkeSyllabusRepository.chapters.size.coerceAtLeast(1)).coerceIn(0f, 1f)
                             },
                             color = SaffronGold,
                             modifier = Modifier.fillMaxWidth()
@@ -190,7 +187,7 @@ fun KsmkeSyllabusScreen(
                             )
                             Spacer(modifier = Modifier.size(6.dp))
                             Text(
-                                text = if (showDualLibrary) "Hide 7-Step Audit" else "7-Step Source Audit (review pending)",
+                                text = if (showDualLibrary) "Hide Teacher Tools" else "Teacher Tools",
                                 color = Color.White
                             )
                         }
@@ -320,7 +317,7 @@ private fun DualLibraryArchitectureCard() {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "7-Step Textbook Audit & Dual-Library Registry",
+                text = "Teacher Tools • Source & Content Review",
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
@@ -335,7 +332,7 @@ private fun DualLibraryArchitectureCard() {
                 FilterChip(
                     selected = selectedLib == 3,
                     onClick = { selectedLib = 3 },
-                    label = { Text("7-Step Audit (pp. 1–342)") }
+                    label = { Text("7-Step Audit") }
                 )
                 FilterChip(
                     selected = selectedLib == 2,
@@ -613,125 +610,60 @@ private fun ChapterCard(
                     modifier = Modifier.padding(top = 10.dp)
                 ) {
                     HorizontalDivider()
-                    val chapterAudit = OfficialSourceLibrary.auditChapter(chapter.chapterNumber)
-                    val supplement = KsmkeSupplementLibrary.byOfficialChapter[chapter.chapterNumber]
-                    Surface(
-                        color = EmeraldChalk.copy(alpha = 0.10f),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = "Audit: ${chapterAudit.certificationState.label} • ${chapterAudit.workedExamplesInApp} worked examples • ${chapterAudit.theoremsInApp} proofs • Exercises: ${chapterAudit.exerciseSetsIndexed}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = IndigoInk,
-                            modifier = Modifier.padding(8.dp)
-                        )
+                    StudentStudySection(title = "Chapter overview • ಅಧ್ಯಾಯದ ಪರಿಚಯ", subtitle = "What this chapter is about") {
+                        Text(text = chapter.summaryEn, style = MaterialTheme.typography.bodyMedium)
+                        Text(text = chapter.summaryKn, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    if (supplement != null) {
-                        Text(
-                            text = "Textbook Bilingual Definitions (pp. ${supplement.startPage}–${supplement.endPage})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        supplement.definitions.forEach { def ->
-                            Text(
-                                text = "• ${def.termEn} (${def.termKn}) [${def.pageRef}]: ${def.definitionEn}",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        Text(
-                            text = "Complete Exercise & Subquestion Index",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        supplement.exercises.forEach { exRec ->
-                            Text(
-                                text = "• ${exRec.exerciseId} (${exRec.pageRef}) • ${exRec.subquestionsSummary} [${exRec.subquestionCount} subparts] — ${exRec.keyConceptTested} (${exRec.verifiedPrototypeAnswer})",
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                        if (supplement.diagrams.isNotEmpty()) {
-                            Text(
-                                text = "Diagrams & Visual Constructions",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = IndigoInk
-                            )
-                            supplement.diagrams.forEach { diag ->
-                                Text(
-                                    text = "• ${diag.diagramId}: ${diag.title} (${diag.pageRef}) — ${diag.renderingType} [${diag.keyLabels}]",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
-                    }
-                    Text(text = chapter.summaryEn, style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        text = chapter.summaryKn,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
 
-                    Text(text = "Layer 2 • Essential Formulas", style = MaterialTheme.typography.titleSmall)
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant,
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            chapter.keyFormulas.forEach { f ->
-                                Text(text = "• $f", style = MathMonoTextStyle)
+                    StudentStudySection(title = "Topics & lesson notes • ವಿಷಯಗಳು", subtitle = "${chapter.detailedTopics.size} topics in this chapter") {
+                        chapter.detailedTopics.forEach { topic ->
+                            val status = topicVerifications[topic.topicNumber] ?: TopicCompletionStatus.NOT_VERIFIED
+                            TopicDetailedNoteBlock(topic, status) { nextStatus ->
+                                onUpdateTopicVerification(topic.topicNumber, nextStatus)
                             }
                         }
                     }
 
-                    chapter.theorems.forEach { th ->
-                        Text(
-                            text = "Theorem (${th.marksWeight}M) • ${th.name} (${th.kannadaName})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        Text(text = th.statement, style = MaterialTheme.typography.bodyMedium)
-                        th.keyProofSteps.forEach { step ->
-                            Text(text = step, style = MaterialTheme.typography.bodySmall)
+                    StudentStudySection(title = "Important formulas • ಮುಖ್ಯ ಸೂತ್ರಗಳು", subtitle = "${chapter.keyFormulas.size} formulas for revision") {
+                        chapter.keyFormulas.forEachIndexed { index, formula ->
+                            Text(text = "${index + 1}. $formula", style = MathMonoTextStyle)
                         }
                     }
 
-                    chapter.solvedExamples.forEach { ex ->
-                        Text(
-                            text = "Solved Board Example • ${ex.title}",
-                            style = MaterialTheme.typography.titleSmall
-                        )
-                        Text(text = ex.problem, style = MaterialTheme.typography.bodyMedium)
-                        ex.markingSteps.forEach { st ->
-                            Text(text = st, style = MathMonoTextStyle)
+                    if (chapter.theorems.isNotEmpty()) {
+                        StudentStudySection(title = "Theorems & proofs • ಪ್ರಮೇಯಗಳು", subtitle = "${chapter.theorems.size} important proof(s)") {
+                            chapter.theorems.forEach { theorem ->
+                                Text(text = "${theorem.name} • ${theorem.marksWeight} marks", style = MaterialTheme.typography.titleSmall, color = IndigoInk)
+                                Text(text = theorem.kannadaName, style = MaterialTheme.typography.bodySmall)
+                                Text(text = theorem.statement, style = MaterialTheme.typography.bodyMedium)
+                                theorem.keyProofSteps.forEachIndexed { index, step -> Text(text = "Step ${index + 1}: $step", style = MaterialTheme.typography.bodySmall) }
+                                HorizontalDivider()
+                            }
                         }
-                        Text(
-                            text = "Final Answer: ${ex.finalAnswer}",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = EmeraldChalk
-                        )
-                        Text(
-                            text = "Examiner Tip: ${ex.examinerTip}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = SaffronGold
-                        )
+                    }
+
+                    if (chapter.solvedExamples.isNotEmpty()) {
+                        StudentStudySection(title = "Solved examples • ಬಿಡಿಸಿದ ಉದಾಹರಣೆಗಳು", subtitle = "${chapter.solvedExamples.size} worked example(s)") {
+                            chapter.solvedExamples.forEachIndexed { index, example ->
+                                Text(text = "Example ${index + 1}: ${example.title}", style = MaterialTheme.typography.titleSmall)
+                                Text(text = "Question: ${example.problem}", style = MaterialTheme.typography.bodyMedium)
+                                example.markingSteps.forEachIndexed { stepIndex, step -> Text(text = "Step ${stepIndex + 1}: $step", style = MathMonoTextStyle) }
+                                Text(text = "Answer: ${example.finalAnswer}", style = MaterialTheme.typography.titleSmall, color = EmeraldChalk)
+                                Text(text = "Exam tip: ${example.examinerTip}", style = MaterialTheme.typography.bodySmall, color = SaffronGold)
+                                if (index < chapter.solvedExamples.lastIndex) HorizontalDivider()
+                            }
+                        }
                     }
 
                     if (chapter.commonMistakes.isNotEmpty()) {
-                        Text(text = "Common Exam Pitfalls", style = MaterialTheme.typography.titleSmall)
-                        chapter.commonMistakes.forEach { m ->
-                            Text(
-                                text = "⚠ $m",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                        StudentStudySection(title = "Quick revision & common mistakes", subtitle = "Check before your exam") {
+                            chapter.commonMistakes.forEach { mistake ->
+                                Text(text = "• $mistake", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            }
                         }
                     }
 
-                    Text(text = "Self-Assess Your Mastery", style = MaterialTheme.typography.titleSmall)
+                    Text(text = "How well do you understand this chapter?", style = MaterialTheme.typography.titleSmall)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState())
@@ -745,27 +677,6 @@ private fun ChapterCard(
                                 selected = mastery == st,
                                 onClick = { onUpdateMastery(st) },
                                 label = { Text(st.label) }
-                            )
-                        }
-                    }
-
-                    if (chapter.detailedTopics.isNotEmpty()) {
-                        val verifiedInCh = chapter.detailedTopics.count {
-                            topicVerifications[it.topicNumber] == TopicCompletionStatus.VERIFIED_COMPLETE
-                        }
-                        Text(
-                            text = "Page-by-Page Textbook Topics ($verifiedInCh/${chapter.detailedTopics.size} Verified)",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = IndigoInk
-                        )
-                        chapter.detailedTopics.forEach { topic ->
-                            val status = topicVerifications[topic.topicNumber] ?: TopicCompletionStatus.NOT_VERIFIED
-                            TopicDetailedNoteBlock(
-                                topic = topic,
-                                verificationStatus = status,
-                                onUpdateVerification = { nextStatus ->
-                                    onUpdateTopicVerification(topic.topicNumber, nextStatus)
-                                }
                             )
                         }
                     }
@@ -789,7 +700,7 @@ private fun ChapterCard(
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.size(6.dp))
-                            Text("Download Notes PDF")
+                            Text("Download Study Notes (PDF)")
                         }
                         OutlinedButton(
                             onClick = onExpandAiNotes,
@@ -810,7 +721,7 @@ private fun ChapterCard(
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.size(6.dp))
-                                Text("AI Deep Notes")
+                                Text("Extra AI Explanation")
                             }
                         }
                     }
@@ -832,7 +743,7 @@ private fun ChapterCard(
                                     verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
                                     Text(
-                                        text = "AI Extended Topic-Wise Notes (Included in PDF)",
+                                        text = "Extra topic explanations (included in the PDF)",
                                         style = MaterialTheme.typography.titleSmall,
                                         color = IndigoInk
                                     )
@@ -856,7 +767,7 @@ private fun ChapterCard(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Solve Chapterwise PYQ-Probability Paper & Check Q & A")
+                        Text("Practise Board Questions")
                     }
 
                     Button(
@@ -870,9 +781,43 @@ private fun ChapterCard(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text("Teach Me This Chapter (10-Step Guruji)")
+                        Text("Learn This Chapter with Guruji")
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StudentStudySection(
+    title: String,
+    subtitle: String? = null,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = IndigoInk)
+                    if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(
+                    imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = if (expanded) "Hide section" else "Show section"
+                )
+            }
+            AnimatedVisibility(visible = expanded) {
+                Column(modifier = Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp), content = content)
             }
         }
     }
@@ -928,13 +873,7 @@ private fun TopicDetailedNoteBlock(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (topic.sourcePageRef.isNotBlank()) {
-                        Text(
-                            text = "${topic.sourcePageRef} • ${topic.exerciseRef} • ${verificationStatus.label}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = statusColor
-                        )
-                    }
+                    Text(text = verificationStatus.label, style = MaterialTheme.typography.labelSmall, color = statusColor)
                 }
                 Icon(
                     imageVector = if (topicExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
@@ -948,14 +887,7 @@ private fun TopicDetailedNoteBlock(
                     modifier = Modifier.padding(top = 8.dp)
                 ) {
                     HorizontalDivider()
-                    if (topic.dikshaModuleTitle.isNotBlank()) {
-                        Text(
-                            text = "Source Reference: ${topic.sourcePageRef} | ${topic.exerciseRef}\nDigital Resource: ${topic.dikshaModuleTitle}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = IndigoInk
-                        )
-                    }
-                    Text("Textbook Verification Status:", style = MaterialTheme.typography.labelLarge)
+                    Text("Your topic progress:", style = MaterialTheme.typography.labelLarge)
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.horizontalScroll(rememberScrollState())
